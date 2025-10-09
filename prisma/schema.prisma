@@ -1,0 +1,283 @@
+// JobMail Database Schema
+// 
+// Defines the data model for JobMail application using Prisma ORM.
+// Database: Neon Postgres (serverless)
+// 
+// Version: 1.0
+// Last Updated: October 8, 2025
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  // Neon uses connection pooling by default
+  directUrl = env("DIRECT_URL") // Optional: for migrations
+}
+
+// ============================================================================
+// MAIN MODELS
+// ============================================================================
+
+/// Job application record
+/// 
+/// Primary entity storing parsed job application data from emails.
+/// Each application is uniquely identified by Gmail threadId.
+model Application {
+  /// UUID primary key
+  id        String   @id @default(uuid())
+  
+  /// Gmail thread ID (unique constraint for deduplication)
+  threadId  String   @unique @db.VarChar(255)
+  
+  /// Latest email ID processed in this thread
+  /// Used to determine if we need to update based on new emails
+  lastEmailId String @db.VarChar(255)
+  
+  // ========== Core Fields ==========
+  
+  /// Company name
+  company   String   @db.VarChar(255)
+  
+  /// Job title/position
+  title     String   @db.VarChar(500)
+  
+  /// URL to job posting (if extracted)
+  jobUrl    String?  @db.Text
+  
+  /// Date when user applied (may be null if not determinable)
+  appliedAt DateTime?
+  
+  /// Current status of application
+  status    ApplicationStatus @default(NEW)
+  
+  /// Source of this application data
+  source    ApplicationSource @default(GMAIL)
+  
+  /// Parser confidence in extracted data
+  confidence ConfidenceLevel @default(MEDIUM)
+  
+  // ========== Metadata Fields ==========
+  
+  /// Detected ATS vendor (Greenhouse, Lever, etc.)
+  atsVendor String? @db.VarChar(100)
+  
+  /// Company domain extracted from email
+  companyDomain String? @db.VarChar(255)
+  
+  /// Raw email subject line (for reference/debugging)
+  rawSubject String? @db.Text
+  
+  /// Raw email snippet (first 200 chars of body)
+  rawSnippet String? @db.Text
+  
+  // ========== Audit Fields ==========
+  
+  /// Record creation timestamp
+  createdAt DateTime @default(now())
+  
+  /// Record last update timestamp
+  updatedAt DateTime @updatedAt
+  
+  // ========== Relations ==========
+  
+  /// Related events (audit trail)
+  events Event[]
+  
+  /// Related inbox messages (for tracking which emails were processed)
+  inboxMessages InboxMessage[]
+
+  // ========== Indexes ==========
+  
+  @@index([company]) // Fast filtering by company
+  @@index([status]) // Fast filtering by status
+  @@index([appliedAt]) // Fast sorting by application date
+  @@index([createdAt]) // Fast sorting by creation date
+  @@index([companyDomain]) // Fast lookup by domain
+  @@map("applications")
+}
+
+/// Audit log / event tracking
+/// 
+/// Records all significant events related to applications.
+/// Used for debugging, analytics, and user activity history.
+model Event {
+  /// UUID primary key
+  id        String   @id @default(uuid())
+  
+  /// Linked application (optional - some events may be global)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  
+  /// Event type (enum-like string)
+  type      EventType
+  
+  /// Arbitrary JSON metadata for this event
+  /// Examples:
+  /// - email_parsed: { messageId, parsedFields, confidence }
+  /// - status_changed: { oldStatus, newStatus, changedBy }
+  /// - error: { errorMessage, stackTrace }
+  metadata  Json?
+  
+  /// Human-readable message (optional)
+  message   String? @db.Text
+  
+  /// Event timestamp
+  createdAt DateTime @default(now())
+
+  // ========== Indexes ==========
+  
+  @@index([applicationId]) // Fast lookup of events for an application
+  @@index([type]) // Fast filtering by event type
+  @@index([createdAt]) // Fast sorting by timestamp
+  @@map("events")
+}
+
+/// Inbox message deduplication
+/// 
+/// Tracks which Gmail messages have been processed to prevent
+/// re-parsing the same email multiple times.
+/// Also used for idempotency checking.
+model InboxMessage {
+  /// UUID primary key
+  id        String   @id @default(uuid())
+  
+  /// Gmail message ID (unique constraint)
+  messageId String   @unique @db.VarChar(255)
+  
+  /// Linked application (if this message created/updated an application)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  
+  /// When this message was processed
+  processedAt DateTime @default(now())
+
+  // ========== Indexes ==========
+  
+  @@index([processedAt]) // Fast cleanup of old records
+  @@map("inbox_messages")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+/// Application status lifecycle
+enum ApplicationStatus {
+  NEW           // Just discovered, not yet applied
+  APPLIED       // Application submitted
+  INTERVIEWING  // In interview process
+  OFFERED       // Received job offer
+  REJECTED      // Application rejected
+  WITHDRAWN     // User withdrew application
+}
+
+/// Source of application data
+enum ApplicationSource {
+  GMAIL   // Parsed from Gmail via add-on
+  MANUAL  // Manually entered by user (future feature)
+}
+
+/// Parser confidence in extracted data
+enum ConfidenceLevel {
+  HIGH    // Known ATS, all fields extracted
+  MEDIUM  // Partial extraction, some fields missing
+  LOW     // Generic pattern match, uncertain data
+}
+
+/// Event types for audit log
+enum EventType {
+  EMAIL_PARSED          // Email successfully parsed
+  APPLICATION_CREATED   // New application created
+  APPLICATION_UPDATED   // Existing application updated
+  STATUS_CHANGED        // Status manually changed by user
+  ERROR                 // Error occurred during processing
+  BATCH_PROCESSED       // Background batch job completed
+}
+
+// ============================================================================
+// NOTES & MIGRATION STRATEGY
+// ============================================================================
+
+// Initial migration command:
+// npx prisma migrate dev --name init
+//
+// Production migration:
+// npx prisma migrate deploy
+//
+// Generate Prisma Client:
+// npx prisma generate
+//
+// Seed database (optional):
+// npx prisma db seed
+
+// ============================================================================
+// FUTURE ENHANCEMENTS (commented out for V1)
+// ============================================================================
+
+// /// User model for multi-user support
+// model User {
+//   id            String   @id @default(uuid())
+//   email         String   @unique
+//   name          String?
+//   emailVerified DateTime?
+//   image         String?
+//   createdAt     DateTime @default(now())
+//   updatedAt     DateTime @updatedAt
+//   
+//   applications  Application[]
+//   
+//   // NextAuth.js fields
+//   accounts      Account[]
+//   sessions      Session[]
+//   
+//   @@map("users")
+// }
+
+// /// NextAuth Account model
+// model Account {
+//   id                 String  @id @default(uuid())
+//   userId             String
+//   type               String
+//   provider           String
+//   providerAccountId  String
+//   refresh_token      String?  @db.Text
+//   access_token       String?  @db.Text
+//   expires_at         Int?
+//   token_type         String?
+//   scope              String?
+//   id_token           String?  @db.Text
+//   session_state      String?
+//
+//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+//
+//   @@unique([provider, providerAccountId])
+//   @@map("accounts")
+// }
+
+// /// NextAuth Session model
+// model Session {
+//   id           String   @id @default(uuid())
+//   sessionToken String   @unique
+//   userId       String
+//   expires      DateTime
+//   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+//   
+//   @@map("sessions")
+// }
+
+// /// Resume tracking (future feature)
+// model Resume {
+//   id            String   @id @default(uuid())
+//   name          String
+//   fileUrl       String
+//   version       Int      @default(1)
+//   uploadedAt    DateTime @default(now())
+//   
+//   applications  Application[]
+//   
+//   @@map("resumes")
+// }
+

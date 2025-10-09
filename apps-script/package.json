@@ -1,0 +1,30 @@
+{
+  "name": "job-tracker-gmail-addon",
+  "version": "1.0.0",
+  "description": "Gmail Add-on for tracking job applications via Vercel API",
+  "main": "dist/bundle.js",
+  "scripts": {
+    "build": "node build.js",
+    "push": "npm run build && clasp push",
+    "deploy": "npm run build && clasp push && clasp deploy",
+    "open": "clasp open",
+    "logs": "clasp logs",
+    "watch": "node build.js --watch"
+  },
+  "keywords": [
+    "gmail",
+    "addon",
+    "apps-script",
+    "job-tracker"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@types/google-apps-script": "^1.0.83",
+    "esbuild": "^0.19.8",
+    "typescript": "^5.3.2"
+  },
+  "dependencies": {}
+}
+
