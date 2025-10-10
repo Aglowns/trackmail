@@ -40,7 +40,7 @@ export default async function SignInPage() {
 
         {/* Features preview */}
         <div className="mt-8 text-center">
-          <p className="text-purple-200 text-sm mb-4">What you'll get:</p>
+          <p className="text-purple-200 text-sm mb-4">What you&apos;ll get:</p>
           <div className="flex justify-center space-x-6 text-purple-200 text-xs">
             <div className="flex items-center">
               <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
