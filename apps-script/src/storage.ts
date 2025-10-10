@@ -125,17 +125,40 @@ function apiRequest<T = any>(
 export function upsertApplication(data: {
   messageId: string;
   threadId: string;
+  lastEmailId?: string;
   company: string;
-  jobTitle: string;
+  title?: string;
+  jobTitle?: string; // Support both field names for backward compatibility
   jobUrl?: string | null;
   source?: string;
   status?: string;
+  confidence?: string;
   appliedAt?: string;
+  rawSubject?: string;
+  rawSnippet?: string;
 }): ApiResponse<Application> {
+  // Map the data to the correct API format
+  const apiData = {
+    threadId: data.threadId,
+    lastEmailId: data.lastEmailId || data.messageId,
+    company: data.company,
+    title: data.title || data.jobTitle, // Use title if available, fallback to jobTitle
+    jobUrl: data.jobUrl,
+    appliedAt: data.appliedAt,
+    status: data.status || 'applied',
+    source: data.source || 'GMAIL',
+    confidence: data.confidence || 'MEDIUM',
+    atsVendor: null,
+    companyDomain: null,
+    rawSubject: data.rawSubject,
+    rawSnippet: data.rawSnippet,
+    messageId: data.messageId, // For deduplication
+  };
+
   return apiRequest<Application>(
     'POST',
     '/api/applications/upsert',
-    data,
+    apiData,
     data.messageId // Use messageId as idempotency key
   );
 }

@@ -11,20 +11,37 @@ JobMail consists of three main components:
 
 ## 📚 Documentation
 
+### Core Documentation
 - **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Complete system design and architecture
-- **[README_BACKEND.md](./README_BACKEND.md)** - Backend setup and deployment guide
+- **[README_BACKEND.md](./README_BACKEND.md)** - Backend API reference
+- **[README_WEB.md](./README_WEB.md)** - Web dashboard guide
 - **[api.types.ts](./api.types.ts)** - TypeScript API contracts
 - **[prisma/schema.prisma](./prisma/schema.prisma)** - Database schema
 
+### Deployment Guides
+- **[STAGE5_DEPLOYMENT_GUIDE.md](./STAGE5_DEPLOYMENT_GUIDE.md)** - Complete production deployment guide
+- **[STAGE5_TROUBLESHOOTING.md](./STAGE5_TROUBLESHOOTING.md)** - Common issues and solutions
+- **[DEPLOYMENT.md](./DEPLOYMENT.md)** - Vercel deployment reference
+- **[SETUP_LOCAL.md](./SETUP_LOCAL.md)** - Local development setup
+
+### Add-on Documentation
+- **[apps-script/README_ADDON.md](./apps-script/README_ADDON.md)** - Gmail Add-on setup and usage
+- **[apps-script/QUICKSTART.md](./apps-script/QUICKSTART.md)** - Quick add-on deployment
+
+### Stage Completion Reports
+- **[STAGE5_COMPLETE.md](./STAGE5_COMPLETE.md)** - Stage 5 completion summary
+- **[PROJECT_COMPLETE.md](./PROJECT_COMPLETE.md)** - Full project completion report
+
 ## 🚀 Quick Start
+
+### Local Development
 
 ```bash
 # Install dependencies
 npm install
 
-# Configure environment
-cp .env.example .env
-# Edit .env with your credentials
+# Configure database (see SETUP_LOCAL.md)
+# Create .env with DATABASE_URL
 
 # Setup database
 npm run db:generate
@@ -36,13 +53,22 @@ npm run dev
 
 Visit: `http://localhost:3000`
 
+### Production Deployment
+
+```powershell
+# One-command deployment to Vercel + Neon
+.\scripts\quick-deploy.ps1 -NeonDatabaseUrl "postgresql://..."
+```
+
+See **[STAGE5_DEPLOYMENT_GUIDE.md](./STAGE5_DEPLOYMENT_GUIDE.md)** for complete instructions.
+
 ## 🏗️ Current Status
 
 - ✅ **Stage 1:** Architecture & System Design
-- ✅ **Stage 2:** Backend API Implementation (You are here)
-- ⏳ **Stage 3:** Gmail Add-on
-- ⏳ **Stage 4:** Web Dashboard
-- ⏳ **Stage 5:** Production Deployment
+- ✅ **Stage 2:** Backend API Implementation
+- ✅ **Stage 3:** Gmail Add-on
+- ✅ **Stage 4:** Web Dashboard
+- ✅ **Stage 5:** Production Deployment (Complete! 🚀)
 
 ## 🛠️ Tech Stack
 

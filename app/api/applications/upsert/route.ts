@@ -11,26 +11,59 @@ import { assertBearerToken, getIdempotencyKey } from '@/lib/authz'
 import { errorResponse, Errors } from '@/lib/errors'
 import { UpsertApplicationSchema } from '@/lib/validators'
 
+/**
+ * Get or create a default user for API key authentication
+ */
+async function getOrCreateApiUser() {
+  const apiUserEmail = 'api@jobmail.local'
+  
+  // Try to find existing API user
+  let user = await prisma.user.findUnique({
+    where: { email: apiUserEmail }
+  })
+
+  // Create API user if doesn't exist
+  if (!user) {
+    user = await prisma.user.create({
+      data: {
+        email: apiUserEmail,
+        name: 'API User',
+        emailVerified: new Date(),
+      }
+    })
+  }
+
+  return user
+}
+
 export async function POST(request: NextRequest) {
   try {
-    // 1. Authenticate request (Bearer token required)
+    // 1. Require authentication
     const auth = assertBearerToken(request)
     if (!auth.authenticated) {
       throw Errors.Unauthorized()
     }
 
-    // 2. Parse and validate request body
+    // 2. Get or create user for API key
+    const user = await getOrCreateApiUser()
+
+    // 3. Parse and validate request body
     const body = await request.json()
     const data = UpsertApplicationSchema.parse(body)
 
-    // 3. Check idempotency (if messageId provided)
+    // 4. Check idempotency (if messageId provided)
     const idempotencyKey = getIdempotencyKey(request)
     const messageId = data.messageId || idempotencyKey
 
     if (messageId) {
-      // Check if this message was already processed
-      const existingMessage = await prisma.inboxMessage.findUnique({
-        where: { messageId },
+      // Check if this message was already processed for this user
+      const existingMessage = await prisma.inboxMessage.findFirst({
+        where: { 
+          messageId,
+          application: {
+            userId: user.id
+          }
+        },
         include: { application: true },
       })
 
@@ -52,9 +85,12 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Check if application exists by threadId
-    const existingApp = await prisma.application.findUnique({
-      where: { threadId: data.threadId },
+    // 5. Check if application exists by threadId and userId
+    const existingApp = await prisma.application.findFirst({
+      where: { 
+        threadId: data.threadId,
+        userId: user.id
+      },
     })
 
     let application
@@ -100,6 +136,7 @@ export async function POST(request: NextRequest) {
       // New application - create it
       application = await prisma.application.create({
         data: {
+          userId: user.id,
           threadId: data.threadId,
           lastEmailId: data.lastEmailId,
           company: data.company,

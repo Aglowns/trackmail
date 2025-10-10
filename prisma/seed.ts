@@ -12,6 +12,17 @@ const prisma = new PrismaClient()
 async function main() {
   console.log('🌱 Seeding database...')
 
+  // Create a demo user first
+  const demoUser = await prisma.user.upsert({
+    where: { email: 'demo@jobmail.local' },
+    update: {},
+    create: {
+      email: 'demo@jobmail.local',
+      name: 'Demo User',
+      emailVerified: new Date(),
+    },
+  })
+
   // Clear existing data (optional - comment out for production)
   await prisma.event.deleteMany()
   await prisma.inboxMessage.deleteMany()
@@ -20,13 +31,14 @@ async function main() {
   // Seed applications
   const app1 = await prisma.application.create({
     data: {
+      userId: demoUser.id,
       threadId: 'thread_sample_001',
       lastEmailId: 'email_sample_001',
       company: 'Google',
       title: 'Senior Software Engineer',
       jobUrl: 'https://careers.google.com/jobs/12345',
       appliedAt: new Date('2025-01-10'),
-      status: 'APPLIED',
+      status: 'applied',
       source: 'GMAIL',
       confidence: 'HIGH',
       atsVendor: 'greenhouse',
@@ -38,13 +50,14 @@ async function main() {
 
   const app2 = await prisma.application.create({
     data: {
+      userId: demoUser.id,
       threadId: 'thread_sample_002',
       lastEmailId: 'email_sample_002',
       company: 'Meta',
       title: 'Frontend Engineer',
       jobUrl: 'https://www.metacareers.com/jobs/54321',
       appliedAt: new Date('2025-01-12'),
-      status: 'INTERVIEWING',
+      status: 'interview',
       source: 'GMAIL',
       confidence: 'HIGH',
       atsVendor: 'lever',
@@ -56,12 +69,13 @@ async function main() {
 
   const app3 = await prisma.application.create({
     data: {
+      userId: demoUser.id,
       threadId: 'thread_sample_003',
       lastEmailId: 'email_sample_003',
       company: 'Stripe',
       title: 'Full Stack Engineer',
       appliedAt: new Date('2025-01-15'),
-      status: 'NEW',
+      status: 'interested',
       source: 'GMAIL',
       confidence: 'MEDIUM',
       companyDomain: 'stripe.com',

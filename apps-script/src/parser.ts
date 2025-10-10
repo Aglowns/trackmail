@@ -202,38 +202,176 @@ function extractCompany(subject: string, from: string, body: string): string | n
  * Extract job title from email
  */
 function extractJobTitle(subject: string, body: string): string | null {
-  // Common patterns for job titles
+  // Comprehensive patterns for job titles from any source
   const patterns = [
+    // Southwest Airlines format: "Application Received for R-2025-60279 Cloud DevOps Engineer Summer 2026 Internships"
+    /Application Received for [A-Z0-9-]+\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:Summer|Fall|Spring|Winter)\s+\d{4}|\s+Internships?|\s+Positions?|$)/i,
+    
+    // General ATS format: "Application Received for [Job Title]"
+    /Application Received for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:at|with|for)|\s+position|\s+role|$)/i,
+    
+    // Reference number format: "Your application for [REF-NUM] [Job Title]"
+    /application for\s+[A-Z0-9-]+\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:has been|was)|$)/i,
+    
+    // Thank you formats: "Thank you for applying to [Job Title]"
+    /Thank you for applying to\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    /Thank you for your application to\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    /Thanks for applying to\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    
+    // Confirmation formats: "We received your application for [Job Title]"
+    /We received your application for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    /We have received your application for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    /Your application has been received for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    
+    // Status update formats: "Update on your application for [Job Title]"
+    /Update on your application for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    /Status update for your application to\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    
+    // Standard patterns
     /(?:for|as|position:)\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:at|position|role)|$)/,
     /(?:role|position):\s+([A-Z][a-zA-Z\s-]+?)(?:\n|$)/,
     /applied\s+for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|$)/i,
     /application\s+for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|$)/i,
+    
+    // Greenhouse format: "Application for [Job Title] at [Company]"
+    /Application for\s+([A-Z][a-zA-Z\s-]+?)\s+at\s+[A-Z]/i,
+    
+    // LinkedIn format: "Your application for [Job Title]"
+    /Your application for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+has|\s+was|$)/i,
+    
+    // Workday format: "Application submitted for [Job Title]"
+    /Application submitted for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+position|\s+role|$)/i,
+    
+    // Indeed format: "Application confirmation for [Job Title]"
+    /Application confirmation for\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    
+    // Glassdoor format: "Your application to [Job Title]"
+    /Your application to\s+([A-Z][a-zA-Z\s-]+?)(?:\s+at|\s+with|\s+for|\s+position|$)/i,
+    
+    // Generic patterns for any email
+    /(?:applied|application|applying)\s+(?:to|for)\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:at|with|for|\s+position|\s+role)|$)/i,
+    /(?:position|role)\s+(?:of|:)\s+([A-Z][a-zA-Z\s-]+?)(?:\s+(?:at|with|for|\s+position|\s+role)|$)/i,
+    
+    // Fallback: Look for capitalized words that could be job titles
+    /(?:for|as|position|role)\s+([A-Z][a-zA-Z]+(?:\s+[A-Z][a-zA-Z]+){1,4})(?:\s+(?:at|with|for|\s+position|\s+role)|$)/,
   ];
   
-  // Try subject first
+  // Try subject first (highest priority)
   for (const pattern of patterns) {
     const match = subject.match(pattern);
     if (match && match[1]) {
       const title = match[1].trim();
-      if (title.length > 3 && title.length < 100) {
+      if (isValidJobTitle(title)) {
         return title;
       }
     }
   }
   
-  // Try body (first 500 chars)
-  const bodyStart = body.substring(0, 500);
+  // Try body (first 1000 chars for better coverage)
+  const bodyStart = body.substring(0, 1000);
   for (const pattern of patterns) {
     const match = bodyStart.match(pattern);
     if (match && match[1]) {
       const title = match[1].trim();
-      if (title.length > 3 && title.length < 100) {
+      if (isValidJobTitle(title)) {
         return title;
       }
     }
   }
   
+  // Last resort: Extract from subject using intelligent parsing
+  const fallbackTitle = extractTitleFromSubject(subject);
+  if (fallbackTitle && isValidJobTitle(fallbackTitle)) {
+    return fallbackTitle;
+  }
+  
   return null;
+}
+
+/**
+ * Intelligent fallback extraction from subject line
+ */
+function extractTitleFromSubject(subject: string): string | null {
+  // Remove common prefixes/suffixes
+  let cleanSubject = subject
+    .replace(/^(Application|Thank you|Thanks|We received|Update|Status).*?(?:for|to|regarding)\s+/i, '')
+    .replace(/\s+(at|with|has been|was|received|submitted).*$/i, '')
+    .replace(/\s+(Summer|Fall|Spring|Winter)\s+\d{4}.*$/i, '')
+    .replace(/\s+(Internships?|Positions?).*$/i, '')
+    .replace(/^[A-Z0-9-]+\s+/, ''); // Remove reference numbers
+  
+  // Look for capitalized sequences that could be job titles
+  const words = cleanSubject.split(/\s+/);
+  const titleWords: string[] = [];
+  
+  for (const word of words) {
+    // Stop if we hit common company indicators
+    if (/^(at|with|for|position|role|job)$/i.test(word)) {
+      break;
+    }
+    
+    // Stop if we hit common email indicators
+    if (/^(received|submitted|applied|application)$/i.test(word)) {
+      break;
+    }
+    
+    // Include capitalized words and common job title words
+    if (/^[A-Z]/.test(word) || /^(and|of|in|the|for)$/i.test(word)) {
+      titleWords.push(word);
+    } else if (titleWords.length > 0) {
+      // Stop if we hit a non-capitalized word after starting a title
+      break;
+    }
+  }
+  
+  const potentialTitle = titleWords.join(' ').trim();
+  return potentialTitle.length > 3 ? potentialTitle : null;
+}
+
+/**
+ * Validate if extracted text looks like a real job title
+ */
+function isValidJobTitle(title: string): boolean {
+  if (!title || title.length < 3 || title.length > 150) {
+    return false;
+  }
+  
+  // Skip generic words that aren't job titles
+  const genericWords = [
+    'position', 'role', 'job', 'opening', 'opportunity', 'vacancy',
+    'application', 'applied', 'received', 'submitted', 'thank you',
+    'confirmation', 'status', 'update', 'notification'
+  ];
+  
+  const lowerTitle = title.toLowerCase();
+  if (genericWords.some(word => lowerTitle === word)) {
+    return false;
+  }
+  
+  // Must contain at least one capital letter (job titles are typically capitalized)
+  if (!/[A-Z]/.test(title)) {
+    return false;
+  }
+  
+  // Skip if it's just a company name (too short or no job-related words)
+  const jobKeywords = [
+    'engineer', 'developer', 'manager', 'analyst', 'specialist', 'coordinator',
+    'assistant', 'director', 'lead', 'senior', 'junior', 'intern', 'internship',
+    'consultant', 'advisor', 'architect', 'designer', 'writer', 'editor',
+    'sales', 'marketing', 'hr', 'finance', 'operations', 'support', 'admin'
+  ];
+  
+  const hasJobKeyword = jobKeywords.some(keyword => 
+    lowerTitle.includes(keyword)
+  );
+  
+  // If it has job keywords, it's likely a real title
+  if (hasJobKeyword) {
+    return true;
+  }
+  
+  // If no job keywords but it's reasonably long and has multiple words, accept it
+  return title.split(' ').length >= 2 && title.length > 8;
 }
 
 /**

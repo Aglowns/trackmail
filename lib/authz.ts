@@ -97,7 +97,7 @@ export async function validateSession(): Promise<AuthResult> {
     return {
       authenticated: true,
       source: 'session',
-      userId: session.user.email || undefined,
+      userId: session.user.id || session.user.email || undefined,
     }
   } catch (error) {
     console.error('Session validation error:', error)

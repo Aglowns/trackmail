@@ -21,16 +21,71 @@ datasource db {
 // MAIN MODELS
 // ============================================================================
 
+/// User model for multi-user support
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  name          String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  applications  Application[]
+  
+  // NextAuth.js fields
+  accounts      Account[]
+  sessions      Session[]
+  
+  @@map("users")
+}
+
+/// NextAuth Account model
+model Account {
+  id                 String  @id @default(uuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?  @db.Text
+  access_token       String?  @db.Text
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?  @db.Text
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+/// NextAuth Session model
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("sessions")
+}
+
 /// Job application record
 /// 
 /// Primary entity storing parsed job application data from emails.
-/// Each application is uniquely identified by Gmail threadId.
+/// Each application is uniquely identified by Gmail threadId per user.
 model Application {
   /// UUID primary key
   id        String   @id @default(uuid())
   
-  /// Gmail thread ID (unique constraint for deduplication)
-  threadId  String   @unique @db.VarChar(255)
+  /// User who owns this application
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  /// Gmail thread ID (unique per user for deduplication)
+  threadId  String   @db.VarChar(255)
   
   /// Latest email ID processed in this thread
   /// Used to determine if we need to update based on new emails
@@ -51,7 +106,7 @@ model Application {
   appliedAt DateTime?
   
   /// Current status of application
-  status    ApplicationStatus @default(NEW)
+  status    ApplicationStatus @default(interested)
   
   /// Source of this application data
   source    ApplicationSource @default(GMAIL)
@@ -91,11 +146,13 @@ model Application {
 
   // ========== Indexes ==========
   
+  @@index([userId]) // Fast filtering by user
   @@index([company]) // Fast filtering by company
   @@index([status]) // Fast filtering by status
   @@index([appliedAt]) // Fast sorting by application date
   @@index([createdAt]) // Fast sorting by creation date
   @@index([companyDomain]) // Fast lookup by domain
+  @@unique([userId, threadId]) // Unique thread per user
   @@map("applications")
 }
 
@@ -166,18 +223,24 @@ model InboxMessage {
 
 /// Application status lifecycle
 enum ApplicationStatus {
-  NEW           // Just discovered, not yet applied
-  APPLIED       // Application submitted
-  INTERVIEWING  // In interview process
-  OFFERED       // Received job offer
-  REJECTED      // Application rejected
-  WITHDRAWN     // User withdrew application
+  interested    // Just discovered, interested in applying
+  applied       // Application submitted
+  screening     // Initial screening/review
+  interview     // In interview process
+  offer         // Received job offer
+  rejected      // Application rejected
 }
 
 /// Source of application data
 enum ApplicationSource {
-  GMAIL   // Parsed from Gmail via add-on
-  MANUAL  // Manually entered by user (future feature)
+  LinkedIn     // LinkedIn job board
+  Greenhouse   // Greenhouse ATS
+  Indeed       // Indeed job board
+  Email        // Direct email application
+  Glassdoor    // Glassdoor job board
+  Workday      // Workday ATS
+  GMAIL        // Parsed from Gmail via add-on
+  MANUAL       // Manually entered by user
 }
 
 /// Parser confidence in extracted data
@@ -195,6 +258,8 @@ enum EventType {
   STATUS_CHANGED        // Status manually changed by user
   ERROR                 // Error occurred during processing
   BATCH_PROCESSED       // Background batch job completed
+  USER_LOGIN            // User authentication event
+  USER_REGISTERED       // New user registration
 }
 
 // ============================================================================
@@ -214,70 +279,22 @@ enum EventType {
 // npx prisma db seed
 
 // ============================================================================
-// FUTURE ENHANCEMENTS (commented out for V1)
+// FUTURE ENHANCEMENTS
 // ============================================================================
-
-// /// User model for multi-user support
-// model User {
-//   id            String   @id @default(uuid())
-//   email         String   @unique
-//   name          String?
-//   emailVerified DateTime?
-//   image         String?
-//   createdAt     DateTime @default(now())
-//   updatedAt     DateTime @updatedAt
-//   
-//   applications  Application[]
-//   
-//   // NextAuth.js fields
-//   accounts      Account[]
-//   sessions      Session[]
-//   
-//   @@map("users")
-// }
-
-// /// NextAuth Account model
-// model Account {
-//   id                 String  @id @default(uuid())
-//   userId             String
-//   type               String
-//   provider           String
-//   providerAccountId  String
-//   refresh_token      String?  @db.Text
-//   access_token       String?  @db.Text
-//   expires_at         Int?
-//   token_type         String?
-//   scope              String?
-//   id_token           String?  @db.Text
-//   session_state      String?
-//
-//   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-//
-//   @@unique([provider, providerAccountId])
-//   @@map("accounts")
-// }
-
-// /// NextAuth Session model
-// model Session {
-//   id           String   @id @default(uuid())
-//   sessionToken String   @unique
-//   userId       String
-//   expires      DateTime
-//   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-//   
-//   @@map("sessions")
-// }
 
 // /// Resume tracking (future feature)
 // model Resume {
 //   id            String   @id @default(uuid())
+//   userId        String
 //   name          String
 //   fileUrl       String
 //   version       Int      @default(1)
 //   uploadedAt    DateTime @default(now())
 //   
+//   user          User     @relation(fields: [userId], references: [id])
 //   applications  Application[]
 //   
 //   @@map("resumes")
 // }
+
 

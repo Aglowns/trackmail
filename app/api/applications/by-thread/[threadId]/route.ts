@@ -21,9 +21,12 @@ export async function GET(
       throw Errors.Unauthorized()
     }
 
-    // 2. Fetch application with events
-    const application = await prisma.application.findUnique({
-      where: { threadId: params.threadId },
+    // 2. Fetch application with events (using compound unique key)
+    const application = await prisma.application.findFirst({
+      where: { 
+        threadId: params.threadId,
+        userId: auth.userId
+      },
       include: {
         events: {
           orderBy: { createdAt: 'desc' },

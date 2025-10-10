@@ -11,15 +11,24 @@ import { z } from 'zod'
 // ============================================================================
 
 export const ApplicationStatusSchema = z.enum([
-  'NEW',
-  'APPLIED',
-  'INTERVIEWING',
-  'OFFERED',
-  'REJECTED',
-  'WITHDRAWN',
+  'interested',
+  'applied',
+  'screening',
+  'interview',
+  'offer',
+  'rejected',
 ])
 
-export const ApplicationSourceSchema = z.enum(['GMAIL', 'MANUAL'])
+export const ApplicationSourceSchema = z.enum([
+  'LinkedIn',
+  'Greenhouse',
+  'Indeed',
+  'Email',
+  'Glassdoor',
+  'Workday',
+  'GMAIL',
+  'MANUAL'
+])
 
 export const ConfidenceLevelSchema = z.enum(['HIGH', 'MEDIUM', 'LOW'])
 
@@ -63,7 +72,7 @@ export type UpsertApplicationInput = z.infer<typeof UpsertApplicationSchema>
  * GET /api/applications (query params)
  */
 export const ListApplicationsSchema = z.object({
-  status: ApplicationStatusSchema.optional(),
+  status: z.string().optional().transform(val => val === 'all' ? undefined : val),
   company: z.string().optional(),
   q: z.string().optional(),
   dateFrom: z.coerce.date().optional(),

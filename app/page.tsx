@@ -1,45 +1,71 @@
-/**
- * Home Page
- * 
- * Landing page for JobMail web dashboard.
- */
+import { DashboardLayout } from '@/components/dashboard-layout'
+import { Suspense } from 'react'
 
-export default function Home() {
+// Force dynamic rendering
+export const dynamic = 'force-dynamic'
+
+export default function DashboardPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24">
-      <div className="text-center">
-        <h1 className="text-4xl font-bold mb-4">JobMail</h1>
-        <p className="text-xl mb-8">Track your job applications automatically</p>
-        
-        <div className="space-y-4 max-w-2xl">
-          <div className="p-6 border rounded-lg">
-            <h2 className="text-2xl font-semibold mb-2">API Status</h2>
-            <p className="text-green-600 font-bold">✓ Backend Running</p>
-          </div>
-
-          <div className="p-6 border rounded-lg text-left">
-            <h3 className="text-xl font-semibold mb-4">Available Endpoints:</h3>
-            <ul className="space-y-2 font-mono text-sm">
-              <li>POST /api/applications/upsert</li>
-              <li>GET /api/applications</li>
-              <li>GET /api/applications/by-thread/:threadId</li>
-              <li>PATCH /api/applications/:id/status</li>
-              <li>POST /api/events</li>
-            </ul>
-          </div>
-
-          <div className="p-6 border rounded-lg">
-            <h3 className="text-xl font-semibold mb-2">Next Steps:</h3>
-            <ol className="list-decimal list-inside text-left space-y-2">
-              <li>Set up Neon Postgres database</li>
-              <li>Configure environment variables (.env)</li>
-              <li>Run database migrations: <code className="bg-gray-100 px-2 py-1 rounded">npx prisma migrate dev</code></li>
-              <li>Install Gmail Add-on (Stage 3)</li>
-            </ol>
-          </div>
-        </div>
-      </div>
-    </main>
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardLayout />
+    </Suspense>
   )
 }
 
+function DashboardSkeleton() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50/30 to-purple-50/30">
+      {/* Header Skeleton */}
+      <div className="bg-white/80 backdrop-blur-md border-b border-gray-200/50 sticky top-0 z-50">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              <div className="w-10 h-10 bg-gray-200 rounded-xl animate-pulse" />
+              <div>
+                <div className="h-6 w-24 bg-gray-200 rounded animate-pulse mb-1" />
+                <div className="h-3 w-32 bg-gray-200 rounded animate-pulse" />
+              </div>
+            </div>
+            <div className="flex-1 max-w-md mx-8">
+              <div className="h-10 bg-gray-200 rounded animate-pulse" />
+            </div>
+            <div className="flex items-center space-x-3">
+              <div className="h-9 w-20 bg-gray-200 rounded animate-pulse" />
+              <div className="h-9 w-9 bg-gray-200 rounded-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content Skeleton */}
+      <main className="container mx-auto px-6 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="bg-white rounded-lg border p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="h-4 w-24 bg-gray-200 rounded animate-pulse mb-2" />
+                  <div className="h-8 w-12 bg-gray-200 rounded animate-pulse" />
+                </div>
+                <div className="w-12 h-12 bg-gray-200 rounded-full animate-pulse" />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Main Content */}
+        <div className="bg-white rounded-lg border">
+          <div className="p-6">
+            <div className="h-8 w-48 bg-gray-200 rounded animate-pulse mb-4" />
+            <div className="space-y-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="h-16 bg-gray-200 rounded animate-pulse" />
+              ))}
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  )
+}

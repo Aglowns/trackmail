@@ -167,12 +167,16 @@ function buildJobApplicationCard(
         .setParameters({
           messageId: emailData.messageId,
           threadId: emailData.threadId,
+          lastEmailId: emailData.messageId,
           company: parsed.company,
-          jobTitle: parsed.jobTitle,
+          title: parsed.jobTitle, // Map jobTitle to title
           jobUrl: parsed.jobUrl || '',
           source: parsed.source,
           status: parsed.status,
+          confidence: parsed.confidence.toUpperCase(), // Ensure uppercase
           appliedAt: emailData.internalDate,
+          rawSubject: emailData.subject,
+          rawSnippet: emailData.bodyText.substring(0, 500), // First 500 chars as snippet
         })
     );
   
@@ -214,12 +218,16 @@ function onSaveApplication(e: any): GoogleAppsScript.Card_Service.ActionResponse
     const result = upsertApplication({
       messageId: params.messageId,
       threadId: params.threadId,
+      lastEmailId: params.lastEmailId || params.messageId,
       company: params.company,
-      jobTitle: params.jobTitle,
+      title: params.title || params.jobTitle, // Support both field names
       jobUrl: params.jobUrl || null,
       source: params.source,
       status: params.status,
+      confidence: params.confidence || 'MEDIUM',
       appliedAt: params.appliedAt,
+      rawSubject: params.rawSubject,
+      rawSnippet: params.rawSnippet,
     });
     
     if (result.success) {

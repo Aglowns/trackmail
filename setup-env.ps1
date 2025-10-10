@@ -87,3 +87,5 @@ Write-Host "   curl http://localhost:3000/api/health" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "📚 Need help? Check SETUP_LOCAL.md for detailed instructions" -ForegroundColor Cyan
 
+
+

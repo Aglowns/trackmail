@@ -70,12 +70,16 @@ export function hourlyScanImpl(): number {
       const result = upsertApplication({
         messageId: emailData.messageId,
         threadId: emailData.threadId,
+        lastEmailId: emailData.messageId,
         company: parsed.company,
-        jobTitle: parsed.jobTitle,
+        title: parsed.jobTitle, // Map jobTitle to title
         jobUrl: parsed.jobUrl,
         source: parsed.source,
         status: parsed.status,
+        confidence: parsed.confidence.toUpperCase(), // Ensure uppercase
         appliedAt: emailData.internalDate,
+        rawSubject: emailData.subject,
+        rawSnippet: emailData.bodyText.substring(0, 500), // First 500 chars as snippet
       });
       
       if (result.success) {
@@ -145,12 +149,16 @@ export function dailyDigestScan(): void {
         const result = upsertApplication({
           messageId: emailData.messageId,
           threadId: emailData.threadId,
+          lastEmailId: emailData.messageId,
           company: parsed.company,
-          jobTitle: parsed.jobTitle,
+          title: parsed.jobTitle, // Map jobTitle to title
           jobUrl: parsed.jobUrl,
           source: parsed.source,
           status: parsed.status,
+          confidence: parsed.confidence.toUpperCase(), // Ensure uppercase
           appliedAt: emailData.internalDate,
+          rawSubject: emailData.subject,
+          rawSnippet: emailData.bodyText.substring(0, 500), // First 500 chars as snippet
         });
         
         if (result.success) {

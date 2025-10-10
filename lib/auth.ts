@@ -2,34 +2,29 @@
  * NextAuth Configuration
  * 
  * Handles user authentication for the web dashboard.
- * Supports GitHub and Google OAuth providers.
+ * Supports GitHub and Google OAuth providers with database persistence.
  */
 
 import { NextAuthOptions } from 'next-auth'
+import { PrismaAdapter } from '@next-auth/prisma-adapter'
 import GithubProvider from 'next-auth/providers/github'
 import GoogleProvider from 'next-auth/providers/google'
+import { prisma } from './prisma'
 
 export const authOptions: NextAuthOptions = {
+  adapter: PrismaAdapter(prisma),
   providers: [
-    // GitHub OAuth
-    ...(process.env.GITHUB_ID && process.env.GITHUB_SECRET
-      ? [
-          GithubProvider({
-            clientId: process.env.GITHUB_ID,
-            clientSecret: process.env.GITHUB_SECRET,
-          }),
-        ]
-      : []),
+    // GitHub OAuth (placeholder for now)
+    GithubProvider({
+      clientId: process.env.GITHUB_ID || "temp_github_id",
+      clientSecret: process.env.GITHUB_SECRET || "temp_github_secret",
+    }),
 
-    // Google OAuth
-    ...(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET
-      ? [
-          GoogleProvider({
-            clientId: process.env.GOOGLE_CLIENT_ID,
-            clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-          }),
-        ]
-      : []),
+    // Google OAuth (placeholder for now)
+    GoogleProvider({
+      clientId: process.env.GOOGLE_CLIENT_ID || "temp_google_id",
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET || "temp_google_secret",
+    }),
   ],
 
   // Session strategy
