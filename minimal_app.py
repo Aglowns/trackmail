@@ -70,10 +70,8 @@ if __name__ == "__main__":
     print(f"🚀 Starting minimal TrackMail API on port {port}")
     print(f"🌐 Server will be available at http://0.0.0.0:{port}")
     uvicorn.run(
-        "minimal_app:app",
+        app,
         host="0.0.0.0",
         port=port,
-        workers=1,
-        log_level="info",
-        reload=False
+        log_level="info"
     )
