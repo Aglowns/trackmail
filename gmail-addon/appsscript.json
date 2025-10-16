@@ -1,0 +1,41 @@
+{
+  "timeZone": "America/New_York",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "gmail": {
+    "name": "TrackMail",
+    "logoUrl": "https://www.gstatic.com/images/branding/product/1x/gmail_48dp.png",
+    "primaryColor": "#667eea",
+    "secondaryColor": "#764ba2",
+    "contextualTriggers": [
+      {
+        "unconditional": {},
+        "onTriggerFunction": "onGmailMessageOpen"
+      }
+    ],
+    "composeTrigger": {
+      "selectActions": [
+        {
+          "text": "TrackMail",
+          "runFunction": "onGmailCompose"
+        }
+      ],
+      "draftAccess": "NONE"
+    },
+    "universalActions": [
+      {
+        "text": "Settings",
+        "runFunction": "onGmailMessageOpen"
+      }
+    ]
+  },
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/gmail.addons.current.action.compose",
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ]
+}
+

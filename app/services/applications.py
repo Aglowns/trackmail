@@ -1,0 +1,238 @@
+"""
+Application Service
+
+Business logic for managing job applications.
+
+This service layer separates business logic from route handlers,
+making the code more testable and maintainable.
+
+Why a service layer?
+- Separates business logic from HTTP concerns
+- Makes testing easier (no need to mock HTTP requests)
+- Reusable across different endpoints
+- Centralizes database queries
+"""
+
+from typing import Optional
+from uuid import UUID
+
+from app.db import get_supabase_client
+from app.schemas import ApplicationCreate, ApplicationUpdate
+
+
+async def create_application(user_id: str, data: ApplicationCreate) -> dict:
+    """
+    Create a new job application for a user.
+    
+    This function:
+    1. Validates the input data (already done by Pydantic)
+    2. Inserts into the database
+    3. Returns the created application
+    
+    RLS automatically ensures the user_id is set correctly.
+    
+    Args:
+        user_id: UUID of the authenticated user
+        data: Application data from request
+        
+    Returns:
+        Created application record
+        
+    Raises:
+        Exception: If database operation fails
+    """
+    supabase = get_supabase_client()
+    
+    # Prepare application data
+    app_data = {
+        "user_id": user_id,
+        "company": data.company,
+        "position": data.position,
+        "status": data.status,
+        "source_url": data.source_url,
+        "location": data.location,
+        "notes": data.notes,
+    }
+    
+    # Insert into database
+    result = supabase.table("applications").insert(app_data).execute()
+    
+    if not result.data:
+        raise Exception("Failed to create application")
+    
+    return result.data[0]
+
+
+async def get_user_applications(
+    user_id: str,
+    skip: int = 0,
+    limit: int = 20,
+    status: Optional[str] = None,
+    company: Optional[str] = None,
+    position: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    """
+    Get applications for a user with filtering and pagination.
+    
+    RLS automatically filters to only this user's applications.
+    
+    Args:
+        user_id: UUID of the authenticated user
+        skip: Number of records to skip (for pagination)
+        limit: Maximum number of records to return
+        status: Optional status filter
+        company: Optional company name filter (case-insensitive partial match)
+        position: Optional position filter (case-insensitive partial match)
+        
+    Returns:
+        Tuple of (applications list, total count)
+        
+    Example:
+        apps, total = await get_user_applications(
+            user_id="123",
+            skip=0,
+            limit=10,
+            status="applied"
+        )
+    """
+    supabase = get_supabase_client()
+    
+    # Build query
+    # Start with base query - RLS handles user_id filtering
+    query = supabase.table("applications").select("*", count="exact")
+    
+    # Apply filters
+    if status:
+        query = query.eq("status", status)
+    
+    if company:
+        # Case-insensitive partial match
+        query = query.ilike("company", f"%{company}%")
+    
+    if position:
+        # Case-insensitive partial match
+        query = query.ilike("position", f"%{position}%")
+    
+    # Apply pagination
+    query = query.range(skip, skip + limit - 1)
+    
+    # Order by most recently updated first
+    query = query.order("updated_at", desc=True)
+    
+    # Execute query
+    result = query.execute()
+    
+    # Extract total count from response
+    total = result.count if result.count is not None else 0
+    
+    return result.data, total
+
+
+async def get_application_by_id(application_id: str, user_id: str) -> Optional[dict]:
+    """
+    Get a single application by ID.
+    
+    RLS ensures user can only access their own applications.
+    
+    Args:
+        application_id: UUID of the application
+        user_id: UUID of the authenticated user (for RLS)
+        
+    Returns:
+        Application record or None if not found
+    """
+    supabase = get_supabase_client()
+    
+    result = (
+        supabase.table("applications")
+        .select("*")
+        .eq("id", application_id)
+        .execute()
+    )
+    
+    if not result.data:
+        return None
+    
+    return result.data[0]
+
+
+async def update_application(
+    application_id: str,
+    user_id: str,
+    data: ApplicationUpdate
+) -> Optional[dict]:
+    """
+    Update an existing application.
+    
+    Only updates fields that are provided (partial update).
+    RLS ensures user can only update their own applications.
+    
+    Args:
+        application_id: UUID of the application to update
+        user_id: UUID of the authenticated user (for RLS)
+        data: Updated fields
+        
+    Returns:
+        Updated application record or None if not found
+    """
+    supabase = get_supabase_client()
+    
+    # Build update data - only include fields that were provided
+    update_data = {}
+    if data.company is not None:
+        update_data["company"] = data.company
+    if data.position is not None:
+        update_data["position"] = data.position
+    if data.status is not None:
+        update_data["status"] = data.status
+    if data.source_url is not None:
+        update_data["source_url"] = data.source_url
+    if data.location is not None:
+        update_data["location"] = data.location
+    if data.notes is not None:
+        update_data["notes"] = data.notes
+    
+    if not update_data:
+        # No fields to update
+        return await get_application_by_id(application_id, user_id)
+    
+    # Perform update
+    result = (
+        supabase.table("applications")
+        .update(update_data)
+        .eq("id", application_id)
+        .execute()
+    )
+    
+    if not result.data:
+        return None
+    
+    return result.data[0]
+
+
+async def delete_application(application_id: str, user_id: str) -> bool:
+    """
+    Delete an application.
+    
+    RLS ensures user can only delete their own applications.
+    Cascade deletes handle related events and emails.
+    
+    Args:
+        application_id: UUID of the application to delete
+        user_id: UUID of the authenticated user (for RLS)
+        
+    Returns:
+        True if deleted, False if not found
+    """
+    supabase = get_supabase_client()
+    
+    result = (
+        supabase.table("applications")
+        .delete()
+        .eq("id", application_id)
+        .execute()
+    )
+    
+    # If data is returned, deletion was successful
+    return bool(result.data)
+

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackMail - Sign In</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 450px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .logo h1 {
+            color: #667eea;
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .logo p {
+            color: #6b7280;
+            font-size: 16px;
+        }
+
+        .auth-container {
+            margin-bottom: 24px;
+        }
+
+        #auth-ui {
+            /* Supabase Auth UI will be inserted here */
+        }
+
+        .status-message {
+            padding: 16px;
+            border-radius: 8px;
+            margin-top: 16px;
+            display: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .status-message.success {
+            background: #d1fae5;
+            color: #065f46;
+            border: 1px solid #6ee7b7;
+        }
+
+        .status-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+            border: 1px solid #fca5a5;
+        }
+
+        .status-message.info {
+            background: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            border: 3px solid #f3f4f6;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 16px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .footer {
+            text-align: center;
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid #e5e7eb;
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        /* Supabase Auth UI Customization */
+        .supabase-auth-ui_ui-button {
+            background: #667eea !important;
+        }
+
+        .supabase-auth-ui_ui-button:hover {
+            background: #5568d3 !important;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h1>📧 TrackMail</h1>
+            <p>Track your job applications seamlessly</p>
+        </div>
+
+        <div class="auth-container">
+            <div id="auth-ui"></div>
+        </div>
+
+        <div id="status-message" class="status-message"></div>
+
+        <div class="footer">
+            <p>Sign in to connect your Gmail Add-on</p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration from backend
+        const SUPABASE_URL = "{{ supabase_url }}";
+        const SUPABASE_ANON_KEY = "{{ supabase_anon_key }}";
+        const AUTH_BRIDGE_URL = window.location.origin;
+
+        // Initialize Supabase client
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // Status message helper
+        function showStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status-message');
+            statusEl.textContent = message;
+            statusEl.className = `status-message ${type}`;
+            statusEl.style.display = 'block';
+        }
+
+        // Initialize Supabase Auth UI
+        async function initAuthUI() {
+            const { data } = await supabase.auth.getSession();
+            
+            if (data.session) {
+                // User is already signed in
+                await handleAuthSuccess(data.session);
+            } else {
+                // Show sign-in form
+                renderAuthUI();
+            }
+        }
+
+        function renderAuthUI() {
+            const authContainer = document.getElementById('auth-ui');
+            
+            // Create a simple email/password form
+            authContainer.innerHTML = `
+                <form id="auth-form" style="display: flex; flex-direction: column; gap: 16px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Email</label>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            required 
+                            style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px;"
+                            placeholder="you@example.com"
+                        />
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; color: #374151; font-weight: 500;">Password</label>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            required 
+                            style="width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 16px;"
+                            placeholder="••••••••"
+                        />
+                    </div>
+                    <button 
+                        type="submit" 
+                        style="width: 100%; padding: 12px; background: #667eea; color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; transition: background 0.2s;"
+                        onmouseover="this.style.background='#5568d3'"
+                        onmouseout="this.style.background='#667eea'"
+                    >
+                        Sign In
+                    </button>
+                    <div style="text-align: center; margin-top: 8px;">
+                        <button 
+                            type="button" 
+                            id="toggle-mode"
+                            style="background: none; border: none; color: #667eea; cursor: pointer; font-size: 14px; text-decoration: underline;"
+                        >
+                            Don't have an account? Sign up
+                        </button>
+                    </div>
+                </form>
+            `;
+
+            let isSignUp = false;
+            const form = document.getElementById('auth-form');
+            const toggleBtn = document.getElementById('toggle-mode');
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            toggleBtn.addEventListener('click', () => {
+                isSignUp = !isSignUp;
+                submitBtn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
+                toggleBtn.textContent = isSignUp ? 'Already have an account? Sign in' : "Don't have an account? Sign up";
+            });
+
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+
+                try {
+                    submitBtn.disabled = true;
+                    submitBtn.textContent = 'Processing...';
+
+                    let result;
+                    if (isSignUp) {
+                        result = await supabase.auth.signUp({ email, password });
+                        if (result.error) throw result.error;
+                        
+                        if (result.data.user && !result.data.session) {
+                            showStatus('Check your email to confirm your account!', 'success');
+                            return;
+                        }
+                    } else {
+                        result = await supabase.auth.signInWithPassword({ email, password });
+                        if (result.error) throw result.error;
+                    }
+
+                    if (result.data.session) {
+                        await handleAuthSuccess(result.data.session);
+                    }
+                } catch (error) {
+                    showStatus(error.message || 'Authentication failed', 'error');
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = isSignUp ? 'Sign Up' : 'Sign In';
+                }
+            });
+        }
+
+        async function handleAuthSuccess(session) {
+            showStatus('Authentication successful! Creating session...', 'success');
+
+            try {
+                // Call the auth bridge to create a session
+                const response = await fetch(`${AUTH_BRIDGE_URL}/session/start`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        access_token: session.access_token,
+                        refresh_token: session.refresh_token,
+                        user_email: session.user.email,
+                        user_id: session.user.id,
+                    }),
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to create session');
+                }
+
+                const data = await response.json();
+                
+                // Show success with session handle
+                showStatus('✓ Sign-in complete! Copy your session handle below:', 'success');
+                
+                // Display session handle for user to copy
+                const authContainer = document.getElementById('auth-ui');
+                authContainer.innerHTML = `
+                    <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin-top: 16px;">
+                        <p style="margin-bottom: 12px; color: #374151; font-weight: 600;">Your Session Handle:</p>
+                        <div style="background: white; padding: 12px; border-radius: 6px; border: 2px solid #667eea; word-break: break-all; font-family: monospace; font-size: 12px; margin-bottom: 12px;">
+                            ${data.session_handle}
+                        </div>
+                        <button 
+                            onclick="copySessionHandle('${data.session_handle}')"
+                            style="width: 100%; padding: 10px; background: #667eea; color: white; border: none; border-radius: 6px; cursor: pointer; font-weight: 600;"
+                        >
+                            Copy to Clipboard
+                        </button>
+                        <p style="margin-top: 16px; color: #6b7280; font-size: 14px; text-align: center;">
+                            Paste this in your Gmail Add-on to complete setup.
+                            <br><br>
+                            <strong>Expires:</strong> ${new Date(data.expires_at).toLocaleString()}
+                        </p>
+                    </div>
+                `;
+            } catch (error) {
+                showStatus('Failed to create session: ' + error.message, 'error');
+            }
+        }
+
+        function copySessionHandle(handle) {
+            navigator.clipboard.writeText(handle).then(() => {
+                showStatus('✓ Session handle copied to clipboard!', 'success');
+            }).catch(err => {
+                showStatus('Failed to copy. Please select and copy manually.', 'error');
+            });
+        }
+
+        // Initialize on page load
+        initAuthUI();
+    </script>
+</body>
+</html>
+
