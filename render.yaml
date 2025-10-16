@@ -2,11 +2,20 @@ services:
   - type: web
     name: trackmail-backend
     env: python
-    plan: free
-    buildCommand: "python debug_render.py && pip install -r requirements.txt"
-    startCommand: "python app.py"
+    buildCommand: pip install -r requirements.txt
+    startCommand: python minimal_app.py
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
       - key: SUPABASE_URL
-        value: https://fvpggfqkmldgwjbanwyr.supabase.co
+        sync: false
       - key: SUPABASE_ANON_KEY
-        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZ2cGdnZnFrbWxkZ3dqYmFud3lyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyNzY5MjIsImV4cCI6MjA3NTg1MjkyMn0.bqVIUz4t-s6Tc-tmglITDTm1KeY5panOfTKkFzzqTwQ
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_AUDIENCE
+        value: authenticated
+      - key: JWT_ISSUER
+        sync: false
