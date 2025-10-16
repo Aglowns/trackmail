@@ -24,6 +24,10 @@ EXPOSE 8080
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PORT=8080
+ENV PYTHONUNBUFFERED=1
+
+# Make start script executable
+RUN chmod +x start.sh
 
 # Start command
-CMD ["python", "simple_server.py"]
+CMD ["./start.sh"]
