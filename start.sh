@@ -3,12 +3,12 @@ echo "🚀 Starting TrackMail backend..."
 echo "📁 Current directory: $(pwd)"
 echo "📋 Files in directory:"
 ls -la
-echo "🔍 Checking for simple_server.py:"
-if [ -f "simple_server.py" ]; then
-    echo "✅ simple_server.py found!"
-    echo "🚀 Starting Python server..."
-    python -u simple_server.py
+echo "🔍 Checking for minimal_app.py:"
+if [ -f "minimal_app.py" ]; then
+    echo "✅ minimal_app.py found!"
+    echo "🚀 Starting FastAPI server..."
+    python -u minimal_app.py
 else
-    echo "❌ simple_server.py NOT found!"
+    echo "❌ minimal_app.py NOT found!"
     exit 1
 fi
