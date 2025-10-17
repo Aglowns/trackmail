@@ -136,8 +136,9 @@ async def ingest_email(
         # Parse email content
         parsed_data = parser.parse_email(email_data)
         
-        # Store email
-        email_record = await email_service.store_email(email_data, parsed_data)
+        # Store email (merge parsed data into email_data)
+        email_data_with_parsed = {**email_data, **parsed_data}
+        email_record = await email_service.store_email(email_data_with_parsed)
         
         # Process application if detected
         if parsed_data.get('is_job_application'):
