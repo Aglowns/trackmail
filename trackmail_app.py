@@ -29,7 +29,7 @@ async def lifespan(app: FastAPI):
     
     # Initialize Supabase
     try:
-        supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_ROLE_KEY)
+        supabase = create_client(settings.supabase_url, settings.supabase_service_role_key)
         print("✅ Supabase client initialized")
     except Exception as e:
         print(f"❌ Failed to initialize Supabase: {e}")
