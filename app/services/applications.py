@@ -13,11 +13,111 @@ Why a service layer?
 - Centralizes database queries
 """
 
-from typing import Optional
+from typing import Optional, List, Dict, Any
 from uuid import UUID
+from datetime import datetime
 
-from app.db import get_supabase_client
+from supabase import Client
 from app.schemas import ApplicationCreate, ApplicationUpdate
+
+
+class ApplicationService:
+    """Service class for managing job applications"""
+    
+    def __init__(self, supabase_client: Client):
+        self.supabase = supabase_client
+    
+    async def get_applications(self, user_id: str = None) -> List[Dict[str, Any]]:
+        """Get all applications"""
+        try:
+            query = self.supabase.table("applications").select("*")
+            if user_id:
+                query = query.eq("user_id", user_id)
+            
+            result = query.order("created_at", desc=True).execute()
+            return result.data or []
+        except Exception as e:
+            print(f"Error getting applications: {e}")
+            raise
+    
+    async def get_application(self, application_id: str) -> Optional[Dict[str, Any]]:
+        """Get specific application by ID"""
+        try:
+            result = self.supabase.table("applications").select("*").eq("id", application_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"Error getting application: {e}")
+            raise
+    
+    async def create_application(self, application_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create a new application"""
+        try:
+            # Add timestamps
+            application_data.update({
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            })
+            
+            result = self.supabase.table("applications").insert(application_data).execute()
+            return result.data[0] if result.data else {}
+        except Exception as e:
+            print(f"Error creating application: {e}")
+            raise
+    
+    async def update_application(self, application_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """Update an application"""
+        try:
+            updates["updated_at"] = datetime.utcnow().isoformat()
+            
+            result = self.supabase.table("applications").update(updates).eq("id", application_id).execute()
+            return result.data[0] if result.data else None
+        except Exception as e:
+            print(f"Error updating application: {e}")
+            raise
+    
+    async def delete_application(self, application_id: str) -> bool:
+        """Delete an application"""
+        try:
+            result = self.supabase.table("applications").delete().eq("id", application_id).execute()
+            return bool(result.data)
+        except Exception as e:
+            print(f"Error deleting application: {e}")
+            raise
+    
+    async def create_or_update_application(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Create or update application based on parsed email data"""
+        try:
+            # Look for existing application with same company and position
+            company = parsed_data.get('company')
+            position = parsed_data.get('position')
+            
+            if company and position:
+                existing = self.supabase.table("applications").select("*").eq("company", company).eq("position", position).execute()
+                
+                if existing.data:
+                    # Update existing application
+                    app_id = existing.data[0]['id']
+                    updates = {
+                        "status": parsed_data.get('status', 'applied'),
+                        "updated_at": datetime.utcnow().isoformat()
+                    }
+                    return await self.update_application(app_id, updates)
+            
+            # Create new application
+            app_data = {
+                "company": company or "Unknown Company",
+                "position": position or "Unknown Position", 
+                "status": parsed_data.get('status', 'applied'),
+                "source_url": parsed_data.get('source_url'),
+                "location": parsed_data.get('location'),
+                "notes": f"Created from email: {parsed_data.get('email_subject', '')}"
+            }
+            
+            return await self.create_application(app_data)
+            
+        except Exception as e:
+            print(f"Error creating/updating application: {e}")
+            raise
 
 
 async def create_application(user_id: str, data: ApplicationCreate) -> dict:

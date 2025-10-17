@@ -13,10 +13,95 @@ This service handles:
 import hashlib
 import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from app.db import get_supabase_client
+from supabase import Client
 from app.schemas import EmailIngest
+
+
+class EmailService:
+    """Service class for managing email messages"""
+    
+    def __init__(self, supabase_client: Client):
+        self.supabase = supabase_client
+    
+    async def store_email(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Store an email message"""
+        try:
+            # Generate hash for deduplication
+            email_hash = self._generate_email_hash(email_data)
+            
+            # Check for duplicates
+            existing = await self._check_duplicate_email(email_hash)
+            if existing:
+                print(f"Duplicate email detected: {email_hash}")
+                return existing
+            
+            # Prepare email record
+            email_record = {
+                "sender": email_data.get('sender', ''),
+                "subject": email_data.get('subject', ''),
+                "text_body": email_data.get('text_body', ''),
+                "html_body": email_data.get('html_body', ''),
+                "received_at": email_data.get('received_at', datetime.utcnow().isoformat()),
+                "parsed_data": {
+                    "email_hash": email_hash,
+                    "parsed_company": email_data.get('parsed_company'),
+                    "parsed_position": email_data.get('parsed_position'),
+                    "parsed_status": email_data.get('parsed_status'),
+                    "is_job_application": email_data.get('is_job_application', False),
+                    "confidence": email_data.get('confidence', 0.0)
+                }
+            }
+            
+            result = self.supabase.table("email_messages").insert(email_record).execute()
+            return result.data[0] if result.data else {}
+            
+        except Exception as e:
+            print(f"Error storing email: {e}")
+            raise
+    
+    async def get_emails(self, application_id: str = None) -> List[Dict[str, Any]]:
+        """Get emails, optionally filtered by application"""
+        try:
+            query = self.supabase.table("email_messages").select("*")
+            if application_id:
+                query = query.eq("application_id", application_id)
+            
+            result = query.order("received_at", desc=True).execute()
+            return result.data or []
+            
+        except Exception as e:
+            print(f"Error getting emails: {e}")
+            raise
+    
+    async def link_to_application(self, email_id: str, application_id: str) -> Optional[Dict[str, Any]]:
+        """Link an email to an application"""
+        try:
+            result = self.supabase.table("email_messages").update({"application_id": application_id}).eq("id", email_id).execute()
+            return result.data[0] if result.data else None
+            
+        except Exception as e:
+            print(f"Error linking email to application: {e}")
+            raise
+    
+    def _generate_email_hash(self, email_data: Dict[str, Any]) -> str:
+        """Generate hash for email deduplication"""
+        canonical = {
+            "sender": email_data.get('sender', '').lower().strip(),
+            "subject": email_data.get('subject', '').strip(),
+            "received_at": email_data.get('received_at', ''),
+        }
+        canonical_str = json.dumps(canonical, sort_keys=True)
+        return hashlib.sha256(canonical_str.encode()).hexdigest()
+    
+    async def _check_duplicate_email(self, email_hash: str) -> Optional[Dict[str, Any]]:
+        """Check if email already exists"""
+        try:
+            result = self.supabase.table("email_messages").select("*").eq("parsed_data->>email_hash", email_hash).execute()
+            return result.data[0] if result.data else None
+        except:
+            return None
 
 
 def generate_email_hash(email_data: EmailIngest) -> str:
