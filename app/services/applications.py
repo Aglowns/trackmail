@@ -58,11 +58,54 @@ class ApplicationService:
                 "updated_at": datetime.utcnow().isoformat()
             })
             
+            # Ensure user_id is set (for testing, use a default test user)
+            if not application_data.get('user_id'):
+                application_data['user_id'] = await self._get_or_create_test_user()
+            
             result = self.supabase.table("applications").insert(application_data).execute()
             return result.data[0] if result.data else {}
         except Exception as e:
             print(f"Error creating application: {e}")
             raise
+    
+    async def _get_or_create_test_user(self) -> str:
+        """Get or create a test user for email ingestion testing"""
+        try:
+            # Try to find existing test user
+            result = self.supabase.table("profiles").select("id").eq("email", "test@trackmail.app").execute()
+            
+            if result.data:
+                return result.data[0]['id']
+            
+            # Create test user if not found
+            import uuid
+            test_user_id = str(uuid.uuid4())
+            
+            profile_data = {
+                "id": test_user_id,
+                "email": "test@trackmail.app",
+                "full_name": "Test User",
+                "created_at": datetime.utcnow().isoformat(),
+                "updated_at": datetime.utcnow().isoformat()
+            }
+            
+            # Insert test user profile
+            profile_result = self.supabase.table("profiles").insert(profile_data).execute()
+            
+            if profile_result.data:
+                print(f"✅ Created test user: {test_user_id}")
+                return test_user_id
+            else:
+                # If profile creation fails, return a random UUID for testing
+                print(f"⚠️ Using random user ID for testing: {test_user_id}")
+                return test_user_id
+                
+        except Exception as e:
+            # Fallback: return a random UUID for testing
+            import uuid
+            test_id = str(uuid.uuid4())
+            print(f"⚠️ Using fallback user ID for testing: {test_id}")
+            return test_id
     
     async def update_application(self, application_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Update an application"""
