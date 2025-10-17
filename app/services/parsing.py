@@ -23,9 +23,85 @@ This is a simplified parser for MVP. In production, you'd want:
 """
 
 import re
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from app.schemas import EmailIngest
+
+
+class EmailParser:
+    """Email parser for job application emails"""
+    
+    def __init__(self):
+        pass
+    
+    def parse_email(self, email_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse email data and extract job application information
+        
+        Args:
+            email_data: Raw email data dictionary
+            
+        Returns:
+            Parsed data with job application information
+        """
+        try:
+            # Convert dict to EmailIngest model if needed
+            if isinstance(email_data, dict):
+                # Extract basic email fields
+                sender = email_data.get('sender', '')
+                subject = email_data.get('subject', '')
+                text_body = email_data.get('text_body', '')
+                
+                # Create a simple EmailIngest-like object
+                class SimpleEmailData:
+                    def __init__(self, sender, subject, text_body):
+                        self.sender = sender
+                        self.subject = subject
+                        self.text_body = text_body
+                        self.parsed_company = None
+                        self.parsed_position = None
+                        self.parsed_status = None
+                
+                email_obj = SimpleEmailData(sender, subject, text_body)
+            else:
+                email_obj = email_data
+            
+            # Parse the email
+            parsed_data = parse_job_application_email(email_obj)
+            
+            # Add additional fields
+            parsed_data.update({
+                'is_job_application': self._is_job_application(email_obj),
+                'email_subject': email_obj.subject,
+                'email_sender': email_obj.sender,
+                'extracted_at': '2025-01-01T00:00:00Z'  # Will be set properly by the service
+            })
+            
+            return parsed_data
+            
+        except Exception as e:
+            print(f"Error parsing email: {e}")
+            # Return default structure on error
+            return {
+                'company': None,
+                'position': None,
+                'status': 'unknown',
+                'confidence': 0.0,
+                'is_job_application': False,
+                'error': str(e)
+            }
+    
+    def _is_job_application(self, email_data) -> bool:
+        """Determine if email is related to job applications"""
+        content = (email_data.subject + " " + (email_data.text_body or "")).lower()
+        
+        job_keywords = [
+            'application', 'interview', 'job', 'position', 'career',
+            'hiring', 'recruit', 'candidate', 'resume', 'cv',
+            'offer', 'employment', 'role', 'opportunity'
+        ]
+        
+        return any(keyword in content for keyword in job_keywords)
 
 
 def extract_company_from_sender(sender: str) -> Optional[str]:
