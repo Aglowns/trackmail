@@ -141,16 +141,23 @@ async def ingest_email(
         email_record = await email_service.store_email(email_data_with_parsed)
         
         # Process application if detected
+        application = None
         if parsed_data.get('is_job_application'):
-            application = await app_service.create_or_update_application(parsed_data)
-            print(f"✅ Application processed: {application.get('id', 'new')}")
+            try:
+                application = await app_service.create_or_update_application(parsed_data)
+                print(f"✅ Application processed: {application.get('id', 'new')}")
+            except Exception as app_error:
+                print(f"⚠️ Application creation failed (but email was stored): {app_error}")
+                # Continue with email ingestion even if application creation fails
+                application = {"error": str(app_error)}
         
         return {
             "status": "success",
             "message": "Email processed successfully",
             "email_id": email_record.get('id'),
             "parsed_data": parsed_data,
-            "is_job_application": parsed_data.get('is_job_application', False)
+            "is_job_application": parsed_data.get('is_job_application', False),
+            "application": application
         }
         
     except Exception as e:
