@@ -194,6 +194,27 @@ async def get_applications(
         print(f"❌ Error getting applications: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get applications: {str(e)}")
 
+@app.post("/v1/applications")
+async def create_application(
+    request: dict,
+    supabase_client: Client = Depends(get_supabase)
+):
+    """Create a new application"""
+    print(f"📋 Creating application: {request}")
+    
+    try:
+        app_service = ApplicationService(supabase_client)
+        application = await app_service.create_application(request)
+        
+        return {
+            "status": "success",
+            "message": "Application created successfully",
+            "application": application
+        }
+    except Exception as e:
+        print(f"❌ Error creating application: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to create application: {str(e)}")
+
 @app.get("/v1/applications/{application_id}")
 async def get_application(
     application_id: str,
