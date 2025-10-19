@@ -26,7 +26,19 @@ app.add_middleware(
 # Basic endpoints
 @app.get("/")
 async def root():
-    return {"name": "TrackMail API", "version": "1.0.0", "status": "running"}
+    return {
+        "message": "TrackMail API is running!",
+        "status": "success",
+        "version": "1.0.0",
+        "endpoints": {
+            "health": "/health",
+            "v1_health": "/v1/health",
+            "ingest_email": "/v1/ingest/email",
+            "applications": "/v1/applications",
+            "test_db": "/v1/test-db",
+            "test_supabase": "/v1/test-supabase"
+        }
+    }
 
 @app.get("/health")
 async def health():
@@ -90,6 +102,32 @@ async def test_supabase():
         }
     except Exception as e:
         return {"status": "error", "message": f"Supabase error: {str(e)}"}
+
+# Applications endpoints
+@app.get("/v1/applications")
+async def get_applications():
+    """Get all applications for the current user"""
+    return {"status": "success", "applications": [], "count": 0}
+
+@app.post("/v1/applications")
+async def create_application():
+    """Create a new application"""
+    return {"status": "success", "message": "Application created successfully"}
+
+@app.get("/v1/applications/{application_id}")
+async def get_application(application_id: str):
+    """Get a specific application"""
+    return {"status": "success", "application": {"id": application_id}}
+
+@app.put("/v1/applications/{application_id}")
+async def update_application(application_id: str):
+    """Update an application"""
+    return {"status": "success", "message": "Application updated successfully"}
+
+@app.delete("/v1/applications/{application_id}")
+async def delete_application(application_id: str):
+    """Delete an application"""
+    return {"status": "success", "message": "Application deleted successfully"}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", 8080))
