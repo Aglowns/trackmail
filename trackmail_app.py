@@ -175,15 +175,35 @@ async def ingest_email_no_prefix(
 
 # Applications endpoints
 @app.get("/v1/applications")
-async def get_applications():
-    """Get all job applications"""
+async def get_applications(status: str = None, search: str = None):
+    """Get all job applications with optional filtering"""
     print(f"📋 Getting applications - found {len(applications_storage)} applications")
+    print(f"🔍 Filters - status: {status}, search: {search}")
     
     try:
+        # Start with all applications
+        filtered_applications = applications_storage.copy()
+        
+        # Filter by status if provided
+        if status and status != 'all':
+            filtered_applications = [app for app in filtered_applications if app.get('status') == status]
+            print(f"📊 After status filter ({status}): {len(filtered_applications)} applications")
+        
+        # Filter by search term if provided
+        if search:
+            search_lower = search.lower()
+            filtered_applications = [
+                app for app in filtered_applications 
+                if (search_lower in app.get('company', '').lower() or 
+                    search_lower in app.get('position', '').lower() or
+                    search_lower in app.get('location', '').lower())
+            ]
+            print(f"🔍 After search filter ({search}): {len(filtered_applications)} applications")
+        
         return {
             "status": "success",
-            "applications": applications_storage,
-            "count": len(applications_storage)
+            "applications": filtered_applications,
+            "count": len(filtered_applications)
         }
     except Exception as e:
         print(f"❌ Error getting applications: {e}")
@@ -331,6 +351,70 @@ async def test_database(
 
 # Simple in-memory storage for applications
 applications_storage = []
+
+# Add some sample applications for testing
+def add_sample_applications():
+    """Add sample applications with different statuses for testing"""
+    import datetime
+    
+    sample_apps = [
+        {
+            "id": "sample-1",
+            "company": "Google",
+            "position": "Software Engineer",
+            "status": "applied",
+            "location": "Mountain View, CA",
+            "source_url": "https://careers.google.com",
+            "notes": "Applied through company website",
+            "created_at": datetime.datetime.now().isoformat(),
+            "updated_at": datetime.datetime.now().isoformat(),
+            "user_id": "temp-user-id"
+        },
+        {
+            "id": "sample-2", 
+            "company": "Microsoft",
+            "position": "Senior Developer",
+            "status": "interview_scheduled",
+            "location": "Seattle, WA",
+            "source_url": "https://careers.microsoft.com",
+            "notes": "Phone interview scheduled for next week",
+            "created_at": datetime.datetime.now().isoformat(),
+            "updated_at": datetime.datetime.now().isoformat(),
+            "user_id": "temp-user-id"
+        },
+        {
+            "id": "sample-3",
+            "company": "Amazon",
+            "position": "Full Stack Developer", 
+            "status": "rejected",
+            "location": "Seattle, WA",
+            "source_url": "https://amazon.jobs",
+            "notes": "Didn't pass the technical interview",
+            "created_at": datetime.datetime.now().isoformat(),
+            "updated_at": datetime.datetime.now().isoformat(),
+            "user_id": "temp-user-id"
+        },
+        {
+            "id": "sample-4",
+            "company": "Meta",
+            "position": "Frontend Engineer",
+            "status": "offer_received",
+            "location": "Menlo Park, CA", 
+            "source_url": "https://careers.meta.com",
+            "notes": "Received offer! Negotiating salary",
+            "created_at": datetime.datetime.now().isoformat(),
+            "updated_at": datetime.datetime.now().isoformat(),
+            "user_id": "temp-user-id"
+        }
+    ]
+    
+    # Only add samples if storage is empty
+    if len(applications_storage) == 0:
+        applications_storage.extend(sample_apps)
+        print(f"📦 Added {len(sample_apps)} sample applications for testing")
+
+# Initialize sample data
+add_sample_applications()
 
 print("✅ All routes defined")
 
