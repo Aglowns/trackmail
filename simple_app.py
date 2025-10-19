@@ -4,7 +4,7 @@ Simple TrackMail Backend - Minimal Working Version
 """
 import os
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 # Create the main app
@@ -110,9 +110,32 @@ async def get_applications():
     return {"status": "success", "applications": [], "count": 0}
 
 @app.post("/v1/applications")
-async def create_application():
+async def create_application(request: Request):
     """Create a new application"""
-    return {"status": "success", "message": "Application created successfully"}
+    try:
+        # Get the request data
+        request_data = await request.json()
+    except:
+        request_data = {}
+    
+    # For now, just return a success response with mock data
+    # In a real implementation, this would save to the database
+    return {
+        "status": "success", 
+        "message": "Application created successfully",
+        "application": {
+            "id": f"app-{int(__import__('time').time())}",
+            "company": request_data.get("company", "Unknown Company"),
+            "position": request_data.get("position", "Unknown Position"),
+            "status": request_data.get("status", "applied"),
+            "location": request_data.get("location", ""),
+            "source_url": request_data.get("source_url", ""),
+            "notes": request_data.get("notes", ""),
+            "created_at": __import__('datetime').datetime.now().isoformat(),
+            "updated_at": __import__('datetime').datetime.now().isoformat(),
+            "user_id": "temp-user-id"
+        }
+    }
 
 @app.get("/v1/applications/{application_id}")
 async def get_application(application_id: str):
