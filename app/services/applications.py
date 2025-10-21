@@ -76,6 +76,20 @@ class ApplicationService:
             print(f"Error creating application: {e}")
             raise
     
+    async def _get_user_by_email(self, email: str) -> Optional[str]:
+        """Get user ID by email from profiles table"""
+        try:
+            result = self.supabase.table("profiles").select("id").eq("email", email).execute()
+            if result.data and len(result.data) > 0:
+                user_id = result.data[0]['id']
+                print(f"✅ Found user by email {email}: {user_id}")
+                return user_id
+            print(f"⚠️ No user found for email: {email}")
+            return None
+        except Exception as e:
+            print(f"⚠️ Error looking up user by email: {e}")
+            return None
+    
     async def _get_or_create_test_user(self) -> str:
         """Get or create a test user for email ingestion testing"""
         test_user_id = "00000000-0000-0000-0000-000000000001"
@@ -178,7 +192,8 @@ class ApplicationService:
                 "status": parsed_data.get('status', 'applied'),
                 "source_url": parsed_data.get('source_url'),
                 "location": parsed_data.get('location'),
-                "notes": f"Created from email: {parsed_data.get('email_subject', '')}"
+                "notes": f"Created from email: {parsed_data.get('email_subject', '')}",
+                "user_id": parsed_data.get('user_id')  # Include user_id from parsed data
             }
             
             return await self.create_application(app_data)

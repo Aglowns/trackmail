@@ -144,6 +144,25 @@ async def ingest_email(
         application = None
         if parsed_data.get('is_job_application'):
             try:
+                # Get user_id from user_email
+                user_email = email_data.get('user_email')
+                user_id = None
+                
+                if user_email:
+                    # Look up user by email in profiles table
+                    user_id = await app_service._get_user_by_email(user_email)
+                    
+                    if not user_id:
+                        print(f"⚠️ User not found for email: {user_email}, using test user")
+                        # Use or create test user
+                        user_id = await app_service._get_or_create_test_user()
+                else:
+                    # No email provided, use test user
+                    user_id = await app_service._get_or_create_test_user()
+                
+                # Add user_id to parsed_data
+                parsed_data['user_id'] = user_id
+                
                 application = await app_service.create_or_update_application(parsed_data)
                 print(f"✅ Application processed: {application.get('id', 'new')}")
             except Exception as app_error:
@@ -152,12 +171,14 @@ async def ingest_email(
                 application = {"error": str(app_error)}
         
         return {
+            "success": True,  # Add success flag for Gmail add-on
             "status": "success",
             "message": "Email processed successfully",
             "email_id": email_record.get('id'),
             "parsed_data": parsed_data,
             "is_job_application": parsed_data.get('is_job_application', False),
-            "application": application
+            "application": application,
+            "application_id": application.get('id') if application and isinstance(application, dict) else None
         }
         
     except Exception as e:
