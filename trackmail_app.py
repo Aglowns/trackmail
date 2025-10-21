@@ -196,44 +196,69 @@ async def ingest_email_no_prefix(
 
 # Applications endpoints
 @app.get("/v1/applications")
-async def get_applications(status: str = None, search: str = None):
-    """Get all job applications with optional filtering"""
-    print(f"📋 Getting applications - found {len(applications_storage)} applications")
+async def get_applications(
+    status: str = None, 
+    search: str = None,
+    supabase_client: Client = Depends(get_supabase)
+):
+    """Get all job applications with optional filtering from Supabase"""
+    print(f"📋 Getting applications from Supabase")
     print(f"🔍 Filters - status: {status}, search: {search}")
     
     try:
-        # Start with all applications
-        filtered_applications = applications_storage.copy()
+        # Query applications from Supabase
+        query = supabase_client.table("applications").select("*")
         
-        # Filter by status if provided
+        # Apply filters
         if status and status != 'all':
-            filtered_applications = [app for app in filtered_applications if app.get('status') == status]
-            print(f"📊 After status filter ({status}): {len(filtered_applications)} applications")
+            query = query.eq("status", status)
         
-        # Filter by search term if provided
         if search:
-            search_lower = search.lower()
-            filtered_applications = [
-                app for app in filtered_applications 
-                if (search_lower in app.get('company', '').lower() or 
-                    search_lower in app.get('position', '').lower() or
-                    search_lower in app.get('location', '').lower())
-            ]
-            print(f"🔍 After search filter ({search}): {len(filtered_applications)} applications")
+            # Use text search for company, position, or location
+            query = query.or_(f"company.ilike.%{search}%,position.ilike.%{search}%,location.ilike.%{search}%")
+        
+        # Execute query
+        result = query.execute()
+        applications = result.data if result.data else []
+        
+        print(f"✅ Found {len(applications)} applications from Supabase")
         
         return {
             "status": "success",
-            "applications": filtered_applications,
-            "count": len(filtered_applications)
+            "applications": applications,
+            "count": len(applications)
         }
     except Exception as e:
-        print(f"❌ Error getting applications: {e}")
-        # Return empty list even if there's an error
-        return {
-            "status": "success",
-            "applications": [],
-            "count": 0
-        }
+        print(f"❌ Error getting applications from Supabase: {e}")
+        # Fallback to in-memory storage if Supabase fails
+        try:
+            filtered_applications = applications_storage.copy()
+            
+            if status and status != 'all':
+                filtered_applications = [app for app in filtered_applications if app.get('status') == status]
+            
+            if search:
+                search_lower = search.lower()
+                filtered_applications = [
+                    app for app in filtered_applications 
+                    if (search_lower in app.get('company', '').lower() or 
+                        search_lower in app.get('position', '').lower() or
+                        search_lower in app.get('location', '').lower())
+                ]
+            
+            print(f"⚠️ Using fallback in-memory storage: {len(filtered_applications)} applications")
+            return {
+                "status": "success",
+                "applications": filtered_applications,
+                "count": len(filtered_applications)
+            }
+        except Exception as fallback_error:
+            print(f"❌ Fallback also failed: {fallback_error}")
+            return {
+                "status": "success",
+                "applications": [],
+                "count": 0
+            }
 
 @app.post("/v1/applications")
 async def create_application(
