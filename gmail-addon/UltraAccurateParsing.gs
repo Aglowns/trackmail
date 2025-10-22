@@ -137,7 +137,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     }
     // Then check other common companies
     else {
-      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft'];
       
       // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
@@ -176,6 +176,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
   // Enhanced position extraction
   let position = 'Unknown Position';
   const positionPatterns = [
+    /Data\s+Engineer\s+Intern/gi,
     /Technology\s+Summer\s+Internship/gi,
     /Software\s+Development\s+and\s+Testing\s+Intern/gi,
     /IT\s+Administrator\s+Intern/gi,
@@ -306,7 +307,7 @@ function quickEmailParsing(htmlBody, subject, sender) {
     }
     // Then check other common companies
     else {
-      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft'];
       
       // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
@@ -347,7 +348,9 @@ function quickEmailParsing(htmlBody, subject, sender) {
   const text = (subject + ' ' + htmlBody).toLowerCase();
   
   // Look for specific position patterns first
-  if (text.includes('technology summer internship')) {
+  if (text.includes('data engineer intern')) {
+    position = 'Data Engineer Intern';
+  } else if (text.includes('technology summer internship')) {
     position = 'Technology Summer Internship';
   } else if (text.includes('software development and testing intern')) {
     position = 'Software Development and Testing Intern';
