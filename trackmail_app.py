@@ -133,8 +133,19 @@ async def ingest_email(
         email_service = EmailService(supabase_client)
         app_service = ApplicationService(supabase_client)
         
-        # Parse email content
-        parsed_data = parser.parse_email(email_data)
+        # Use parsed data from Gmail add-on if available, otherwise parse locally
+        if email_data.get('parsed_company') and email_data.get('parsed_position'):
+            print("✅ Using parsed data from Gmail add-on")
+            parsed_data = {
+                'company': email_data.get('parsed_company'),
+                'position': email_data.get('parsed_position'),
+                'email_type': email_data.get('parsed_email_type', 'new_application'),
+                'confidence': email_data.get('parsed_confidence', 90),
+                'is_job_application': True
+            }
+        else:
+            print("⚠️ No parsed data from Gmail add-on, using local parsing")
+            parsed_data = parser.parse_email(email_data)
         
         # Store email (merge parsed data into email_data)
         email_data_with_parsed = {**email_data, **parsed_data}
