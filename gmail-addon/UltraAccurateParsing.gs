@@ -125,41 +125,50 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
   
   // If not found in subject, try common companies - prioritize email body over sender
   if (company === 'Unknown Company') {
-    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Wells Fargo', 'SAS', 'WellsFargo', 'WellsFargoHR'];
-    
-    // First check email body (higher priority) - handle case insensitive
-    for (const comp of commonCompanies) {
-      if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
-        company = comp;
-        break;
-      }
+    // First check for Wells Fargo specifically (most common issue)
+    if (htmlBody.toLowerCase().includes('wells fargo') || subject.toLowerCase().includes('wells fargo') || sender.toLowerCase().includes('wellsfargo')) {
+      company = 'Wells Fargo';
+      console.log('✅ Enhanced parsing: Detected Wells Fargo from email content');
     }
-    
-    // If still not found, check subject
-    if (company === 'Unknown Company') {
+    // Then check for SAS
+    else if (htmlBody.toLowerCase().includes('sas') || subject.toLowerCase().includes('sas') || sender.toLowerCase().includes('sas')) {
+      company = 'SAS';
+      console.log('✅ Enhanced parsing: Detected SAS from email content');
+    }
+    // Then check other common companies
+    else {
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+      
+      // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
-        if (subject.toLowerCase().includes(comp.toLowerCase())) {
+        if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
           company = comp;
           break;
         }
       }
-    }
-    
-    // If still not found, try extracting from sender email domain
-    if (company === 'Unknown Company' && sender) {
-      const senderLower = sender.toLowerCase();
-      if (senderLower.includes('wellsfargo') || senderLower.includes('wells.fargo')) {
-        company = 'Wells Fargo';
-      } else if (senderLower.includes('sas.com')) {
-        company = 'SAS';
-      } else if (senderLower.includes('tiktok')) {
-        company = 'TikTok';
-      } else if (senderLower.includes('google')) {
-        company = 'Google';
-      } else if (senderLower.includes('microsoft')) {
-        company = 'Microsoft';
-      } else if (senderLower.includes('amazon')) {
-        company = 'Amazon';
+      
+      // If still not found, check subject
+      if (company === 'Unknown Company') {
+        for (const comp of commonCompanies) {
+          if (subject.toLowerCase().includes(comp.toLowerCase())) {
+            company = comp;
+            break;
+          }
+        }
+      }
+      
+      // If still not found, try extracting from sender email domain
+      if (company === 'Unknown Company' && sender) {
+        const senderLower = sender.toLowerCase();
+        if (senderLower.includes('tiktok')) {
+          company = 'TikTok';
+        } else if (senderLower.includes('google')) {
+          company = 'Google';
+        } else if (senderLower.includes('microsoft')) {
+          company = 'Microsoft';
+        } else if (senderLower.includes('amazon')) {
+          company = 'Amazon';
+        }
       }
     }
   }
@@ -285,41 +294,50 @@ function quickEmailParsing(htmlBody, subject, sender) {
   
   // Try common companies if not found in subject - prioritize email body
   if (company === 'Unknown Company') {
-    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Wells Fargo', 'SAS', 'WellsFargo', 'WellsFargoHR'];
-    
-    // First check email body (higher priority) - handle case insensitive
-    for (const comp of commonCompanies) {
-      if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
-        company = comp;
-        break;
-      }
+    // First check for Wells Fargo specifically (most common issue)
+    if (htmlBody.toLowerCase().includes('wells fargo') || subject.toLowerCase().includes('wells fargo') || sender.toLowerCase().includes('wellsfargo')) {
+      company = 'Wells Fargo';
+      console.log('✅ Detected Wells Fargo from email content');
     }
-    
-    // If still not found, check subject
-    if (company === 'Unknown Company') {
+    // Then check for SAS
+    else if (htmlBody.toLowerCase().includes('sas') || subject.toLowerCase().includes('sas') || sender.toLowerCase().includes('sas')) {
+      company = 'SAS';
+      console.log('✅ Detected SAS from email content');
+    }
+    // Then check other common companies
+    else {
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+      
+      // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
-        if (subject.toLowerCase().includes(comp.toLowerCase())) {
+        if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
           company = comp;
           break;
         }
       }
-    }
-    
-    // If still not found, try extracting from sender email domain
-    if (company === 'Unknown Company' && sender) {
-      const senderLower = sender.toLowerCase();
-      if (senderLower.includes('wellsfargo') || senderLower.includes('wells.fargo')) {
-        company = 'Wells Fargo';
-      } else if (senderLower.includes('sas.com')) {
-        company = 'SAS';
-      } else if (senderLower.includes('tiktok')) {
-        company = 'TikTok';
-      } else if (senderLower.includes('google')) {
-        company = 'Google';
-      } else if (senderLower.includes('microsoft')) {
-        company = 'Microsoft';
-      } else if (senderLower.includes('amazon')) {
-        company = 'Amazon';
+      
+      // If still not found, check subject
+      if (company === 'Unknown Company') {
+        for (const comp of commonCompanies) {
+          if (subject.toLowerCase().includes(comp.toLowerCase())) {
+            company = comp;
+            break;
+          }
+        }
+      }
+      
+      // If still not found, try extracting from sender email domain
+      if (company === 'Unknown Company' && sender) {
+        const senderLower = sender.toLowerCase();
+        if (senderLower.includes('tiktok')) {
+          company = 'TikTok';
+        } else if (senderLower.includes('google')) {
+          company = 'Google';
+        } else if (senderLower.includes('microsoft')) {
+          company = 'Microsoft';
+        } else if (senderLower.includes('amazon')) {
+          company = 'Amazon';
+        }
       }
     }
   }
