@@ -125,11 +125,11 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
   
   // If not found in subject, try common companies - prioritize email body over sender
   if (company === 'Unknown Company') {
-    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Wells Fargo', 'SAS', 'WellsFargo', 'WellsFargoHR'];
     
-    // First check email body (higher priority)
+    // First check email body (higher priority) - handle case insensitive
     for (const comp of commonCompanies) {
-      if (htmlBody.includes(comp)) {
+      if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
         company = comp;
         break;
       }
@@ -138,10 +138,28 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     // If still not found, check subject
     if (company === 'Unknown Company') {
       for (const comp of commonCompanies) {
-        if (subject.includes(comp)) {
+        if (subject.toLowerCase().includes(comp.toLowerCase())) {
           company = comp;
           break;
         }
+      }
+    }
+    
+    // If still not found, try extracting from sender email domain
+    if (company === 'Unknown Company' && sender) {
+      const senderLower = sender.toLowerCase();
+      if (senderLower.includes('wellsfargo') || senderLower.includes('wells.fargo')) {
+        company = 'Wells Fargo';
+      } else if (senderLower.includes('sas.com')) {
+        company = 'SAS';
+      } else if (senderLower.includes('tiktok')) {
+        company = 'TikTok';
+      } else if (senderLower.includes('google')) {
+        company = 'Google';
+      } else if (senderLower.includes('microsoft')) {
+        company = 'Microsoft';
+      } else if (senderLower.includes('amazon')) {
+        company = 'Amazon';
       }
     }
   }
@@ -149,6 +167,8 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
   // Enhanced position extraction
   let position = 'Unknown Position';
   const positionPatterns = [
+    /Technology\s+Summer\s+Internship/gi,
+    /Software\s+Development\s+and\s+Testing\s+Intern/gi,
     /IT\s+Administrator\s+Intern/gi,
     /Software\s+Engineer\s+Co-Op/gi,
     /Software\s+Engineer\s+Intern/gi,
@@ -265,11 +285,11 @@ function quickEmailParsing(htmlBody, subject, sender) {
   
   // Try common companies if not found in subject - prioritize email body
   if (company === 'Unknown Company') {
-    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth'];
+    const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Wells Fargo', 'SAS', 'WellsFargo', 'WellsFargoHR'];
     
-    // First check email body (higher priority)
+    // First check email body (higher priority) - handle case insensitive
     for (const comp of commonCompanies) {
-      if (htmlBody.includes(comp)) {
+      if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
         company = comp;
         break;
       }
@@ -278,10 +298,28 @@ function quickEmailParsing(htmlBody, subject, sender) {
     // If still not found, check subject
     if (company === 'Unknown Company') {
       for (const comp of commonCompanies) {
-        if (subject.includes(comp)) {
+        if (subject.toLowerCase().includes(comp.toLowerCase())) {
           company = comp;
           break;
         }
+      }
+    }
+    
+    // If still not found, try extracting from sender email domain
+    if (company === 'Unknown Company' && sender) {
+      const senderLower = sender.toLowerCase();
+      if (senderLower.includes('wellsfargo') || senderLower.includes('wells.fargo')) {
+        company = 'Wells Fargo';
+      } else if (senderLower.includes('sas.com')) {
+        company = 'SAS';
+      } else if (senderLower.includes('tiktok')) {
+        company = 'TikTok';
+      } else if (senderLower.includes('google')) {
+        company = 'Google';
+      } else if (senderLower.includes('microsoft')) {
+        company = 'Microsoft';
+      } else if (senderLower.includes('amazon')) {
+        company = 'Amazon';
       }
     }
   }
@@ -291,7 +329,11 @@ function quickEmailParsing(htmlBody, subject, sender) {
   const text = (subject + ' ' + htmlBody).toLowerCase();
   
   // Look for specific position patterns first
-  if (text.includes('it administrator intern')) {
+  if (text.includes('technology summer internship')) {
+    position = 'Technology Summer Internship';
+  } else if (text.includes('software development and testing intern')) {
+    position = 'Software Development and Testing Intern';
+  } else if (text.includes('it administrator intern')) {
     position = 'IT Administrator Intern';
   } else if (text.includes('software engineer co-op')) {
     position = 'Software Engineer Co-Op';
