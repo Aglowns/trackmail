@@ -134,14 +134,70 @@ async def ingest_email(
         app_service = ApplicationService(supabase_client)
         
         # Use parsed data from Gmail add-on if available, otherwise parse locally
+        def normalize_status_from_email(email_payload: dict) -> str:
+            """Normalize status strings coming from the Gmail add-on."""
+            raw_status = (email_payload.get('detected_status')
+                          or email_payload.get('parsed_status')
+                          or email_payload.get('parsed_email_type')
+                          or email_payload.get('email_type'))
+            if not raw_status:
+                return 'applied'
+
+            normalized = str(raw_status).lower().strip()
+
+            status_map = {
+                'rejection': 'rejected',
+                'rejected': 'rejected',
+                'reject': 'rejected',
+                'applied': 'applied',
+                'application_confirmation': 'applied',
+                'application': 'applied',
+                'new_application': 'applied',
+                'interview': 'interviewing',
+                'interviewing': 'interviewing',
+                'interview_scheduled': 'interview_scheduled',
+                'interview_scheduling': 'interview_scheduled',
+                'interview_completed': 'interview_completed',
+                'offer': 'offer_received',
+                'offer_received': 'offer_received',
+                'offer_extended': 'offer_received',
+                'offer_accepted': 'accepted',
+                'accepted': 'accepted',
+                'withdrawn': 'withdrawn',
+            }
+
+            if normalized in status_map:
+                return status_map[normalized]
+
+            # Keyword-based fallback
+            if 'reject' in normalized or 'not selected' in normalized:
+                return 'rejected'
+            if 'offer' in normalized or 'congratulations' in normalized:
+                return 'offer_received'
+            if 'interview' in normalized or 'next step' in normalized or 'schedule' in normalized:
+                return 'interview_scheduled'
+            if 'accept' in normalized:
+                return 'accepted'
+            if 'withdraw' in normalized:
+                return 'withdrawn'
+
+            return 'applied'
+
         if email_data.get('parsed_company') and email_data.get('parsed_position'):
             print("✅ Using parsed data from Gmail add-on")
+            normalized_status = normalize_status_from_email(email_data)
+            print(f"🔍 Gmail add-on detected status: {email_data.get('detected_status')} -> normalized: {normalized_status}")
+
             parsed_data = {
                 'company': email_data.get('parsed_company'),
                 'position': email_data.get('parsed_position'),
                 'email_type': email_data.get('parsed_email_type', 'new_application'),
                 'confidence': email_data.get('parsed_confidence', 90),
-                'is_job_application': True
+                'status': normalized_status,
+                'status_confidence': email_data.get('status_confidence'),
+                'status_indicators': email_data.get('status_indicators'),
+                'status_reasoning': email_data.get('status_reasoning'),
+                'is_job_application': normalized_status != 'not_job_related'
             }
         else:
             print("⚠️ No parsed data from Gmail add-on, using local parsing")
@@ -149,6 +205,7 @@ async def ingest_email(
         
         # Store email (merge parsed data into email_data)
         email_data_with_parsed = {**email_data, **parsed_data}
+        email_data_with_parsed['normalized_status'] = parsed_data.get('status', 'applied')
         email_record = await email_service.store_email(email_data_with_parsed)
         
         # Process application if detected

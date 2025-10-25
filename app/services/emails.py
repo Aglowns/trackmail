@@ -35,7 +35,33 @@ class EmailService:
             existing = await self._check_duplicate_email(email_hash)
             if existing:
                 print(f"Duplicate email detected: {email_hash}")
-                return existing
+                # Update existing record with latest parsed fields (status, confidence, etc.)
+                updated_parsed_data = existing.get("parsed_data", {})
+                updated_parsed_data.update({
+                    "parsed_company": email_data.get('parsed_company', updated_parsed_data.get('parsed_company')),
+                    "parsed_position": email_data.get('parsed_position', updated_parsed_data.get('parsed_position')),
+                    "parsed_status": email_data.get('parsed_status', updated_parsed_data.get('parsed_status')),
+                    "normalized_status": email_data.get('normalized_status', updated_parsed_data.get('normalized_status')),
+                    "confidence": email_data.get('confidence', updated_parsed_data.get('confidence', 0.0)),
+                    "status_confidence": email_data.get('status_confidence', updated_parsed_data.get('status_confidence')),
+                    "status_indicators": email_data.get('status_indicators', updated_parsed_data.get('status_indicators')),
+                    "status_reasoning": email_data.get('status_reasoning', updated_parsed_data.get('status_reasoning')),
+                })
+
+                updates = {
+                    "parsed_data": updated_parsed_data,
+                    "updated_at": datetime.utcnow().isoformat()
+                }
+
+                result = (
+                    self.supabase
+                    .table("email_messages")
+                    .update(updates)
+                    .eq("id", existing["id"])
+                    .execute()
+                )
+
+                return result.data[0] if result.data else existing
             
             # Prepare email record
             email_record = {
@@ -49,8 +75,12 @@ class EmailService:
                     "parsed_company": email_data.get('parsed_company'),
                     "parsed_position": email_data.get('parsed_position'),
                     "parsed_status": email_data.get('parsed_status'),
+                    "normalized_status": email_data.get('normalized_status'),
                     "is_job_application": email_data.get('is_job_application', False),
-                    "confidence": email_data.get('confidence', 0.0)
+                    "confidence": email_data.get('confidence', 0.0),
+                    "status_confidence": email_data.get('status_confidence'),
+                    "status_indicators": email_data.get('status_indicators'),
+                    "status_reasoning": email_data.get('status_reasoning'),
                 }
             }
             
