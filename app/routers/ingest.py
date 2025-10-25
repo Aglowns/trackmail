@@ -102,6 +102,13 @@ async def ingest_email(
     print(f"Parsed company: {getattr(email_data, 'parsed_company', 'NOT_SET')}")
     print(f"Parsed position: {getattr(email_data, 'parsed_position', 'NOT_SET')}")
     
+    # Debug: Print all attributes of email_data
+    print(f"All email_data attributes: {dir(email_data)}")
+    if hasattr(email_data, 'detected_status'):
+        print(f"detected_status value: '{email_data.detected_status}' (type: {type(email_data.detected_status)})")
+    if hasattr(email_data, 'parsed_status'):
+        print(f"parsed_status value: '{email_data.parsed_status}' (type: {type(email_data.parsed_status)})")
+    
     parsed = parse_job_application_email(email_data)
     print(f"Final parsed result: {parsed}")
     

@@ -293,9 +293,15 @@ def parse_job_application_email(email_data: EmailIngest) -> dict:
         position = extract_position_from_subject(email_data.subject)
     
     # Use AI-detected status if available, otherwise fall back to parsed status or content analysis
+    print(f"DEBUG: Checking for detected_status...")
+    print(f"DEBUG: hasattr(email_data, 'detected_status'): {hasattr(email_data, 'detected_status')}")
+    if hasattr(email_data, 'detected_status'):
+        print(f"DEBUG: detected_status value: '{email_data.detected_status}' (type: {type(email_data.detected_status)})")
+        print(f"DEBUG: detected_status is truthy: {bool(email_data.detected_status)}")
+    
     if hasattr(email_data, 'detected_status') and email_data.detected_status:
         status = email_data.detected_status
-        print(f"Using AI-detected status: {status}")
+        print(f"✅ Using AI-detected status: {status}")
     elif hasattr(email_data, 'parsed_status') and email_data.parsed_status:
         status = email_data.parsed_status
         print(f"Using parsed status: {status}")
