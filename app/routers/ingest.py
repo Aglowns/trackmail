@@ -95,8 +95,8 @@ async def ingest_email(
         print(f"🔄 New email parsed status: {parsed.get('status')}")
         
         # Get the existing application to check current status
-        from app.services.applications import get_application
-        existing_app = await get_application(existing_email["application_id"])
+        from app.services.applications import get_application_by_id
+        existing_app = await get_application_by_id(existing_email["application_id"], user_id)
         current_status = existing_app.get("status") if existing_app else "applied"
         print(f"🔄 Existing application status: {current_status}")
         
