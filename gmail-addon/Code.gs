@@ -476,7 +476,7 @@ function fetchEmailData(messageId, accessToken) {
       subject: message.getSubject(),
       text_body: message.getPlainBody(),
       html_body: message.getBody(),
-      received_at: message.getDate().toISOString(),
+    received_at: message.getDate().toISOString(),
       user_email: userEmail || 'aglonoop@gmail.com' // Include user email for backend
     };
     

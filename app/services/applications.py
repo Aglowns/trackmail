@@ -193,7 +193,8 @@ class ApplicationService:
                 "source_url": parsed_data.get('source_url'),
                 "location": parsed_data.get('location'),
                 "notes": f"Created from email: {parsed_data.get('email_subject', '')}",
-                "user_id": parsed_data.get('user_id')  # Include user_id from parsed data
+                "user_id": parsed_data.get('user_id'),  # Include user_id from parsed data
+                "applied_at": parsed_data.get('applied_at'),
             }
             
             return await self.create_application(app_data)
@@ -235,6 +236,7 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
         "source_url": data.source_url,
         "location": data.location,
         "notes": data.notes,
+        "applied_at": data.applied_at,
     }
     
     # Insert into database

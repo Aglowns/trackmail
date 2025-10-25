@@ -66,12 +66,14 @@ class EmailService:
                 return result.data[0] if result.data else existing
             
             # Prepare email record
+            received_at = email_data.get('received_at')
             email_record = {
                 "sender": email_data.get('sender', ''),
                 "subject": email_data.get('subject', ''),
                 "text_body": email_data.get('text_body', ''),
                 "html_body": email_data.get('html_body', ''),
-                "received_at": email_data.get('received_at', datetime.utcnow().isoformat()),
+                "received_at": received_at or datetime.utcnow().isoformat(),
+        "received_at": email_data.get('received_at', datetime.utcnow().isoformat()),
                 "parsed_data": {
                     "email_hash": email_hash,
                     "parsed_company": email_data.get('parsed_company'),

@@ -208,6 +208,7 @@ async def ingest_email(
         email_data_with_parsed = {**email_data, **parsed_data}
         email_data_with_parsed['normalized_status'] = parsed_data.get('status', 'applied')
         email_data_with_parsed['parsed_status'] = parsed_data.get('status', 'applied')
+        email_data_with_parsed['received_at'] = email_data.get('received_at')
         email_record = await email_service.store_email(email_data_with_parsed)
         
         # Process application if detected
@@ -232,6 +233,9 @@ async def ingest_email(
                 
                 # Add user_id to parsed_data
                 parsed_data['user_id'] = user_id
+                applied_at = parsed_data.get('applied_at') or email_data.get('received_at')
+                if applied_at:
+                    parsed_data['applied_at'] = applied_at
                 
                 application = await app_service.create_or_update_application(parsed_data)
                 print(f"✅ Application processed: {application.get('id', 'new')}")

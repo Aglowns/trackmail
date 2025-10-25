@@ -48,6 +48,7 @@ class ApplicationBase(BaseModel):
     source_url: Optional[str] = Field(None, description="URL to job posting")
     location: Optional[str] = Field(None, description="Job location")
     notes: Optional[str] = Field(None, description="User notes")
+    applied_at: Optional[datetime] = Field(None, description="When the application was first received")
 
 
 class ApplicationCreate(ApplicationBase):
