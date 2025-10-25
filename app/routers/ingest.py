@@ -87,13 +87,57 @@ async def ingest_email(
     existing_email = await check_duplicate_email(email_hash)
     
     if existing_email and existing_email.get("application_id"):
-        # Duplicate found with linked application
-        return IngestResponse(
-            success=True,
-            application_id=existing_email["application_id"],
-            message="Duplicate email detected, using existing application",
-            duplicate=True,
-        )
+        # Duplicate found with linked application - check if status needs updating
+        print(f"🔄 Duplicate email detected, checking for status update...")
+        
+        # Parse the new email to get the updated status
+        parsed = parse_job_application_email(email_data)
+        print(f"🔄 New email parsed status: {parsed.get('status')}")
+        
+        # Get the existing application to check current status
+        from app.services.applications import get_application
+        existing_app = await get_application(existing_email["application_id"])
+        current_status = existing_app.get("status") if existing_app else "applied"
+        print(f"🔄 Existing application status: {current_status}")
+        
+        # If status has changed, update the application
+        if parsed.get("status") != current_status and parsed.get("status") != "applied":
+            print(f"🔄 Status changed from '{current_status}' to '{parsed.get('status')}' - updating application")
+            
+            # Update the application with new status
+            from app.services.applications import update_application
+            from app.schemas import ApplicationUpdate
+            
+            update_data = ApplicationUpdate(
+                status=parsed.get("status"),
+                notes=f"Status updated from email. Previous: {current_status}, New: {parsed.get('status')}"
+            )
+            
+            try:
+                await update_application(existing_email["application_id"], user_id, update_data)
+                print(f"✅ Application status updated successfully")
+                return IngestResponse(
+                    success=True,
+                    application_id=existing_email["application_id"],
+                    message=f"Duplicate email detected, but status updated from '{current_status}' to '{parsed.get('status')}'",
+                    duplicate=True,
+                )
+            except Exception as e:
+                print(f"❌ Failed to update application status: {e}")
+                return IngestResponse(
+                    success=True,
+                    application_id=existing_email["application_id"],
+                    message="Duplicate email detected, using existing application (status update failed)",
+                    duplicate=True,
+                )
+        else:
+            print(f"🔄 No status change needed (current: {current_status}, new: {parsed.get('status')})")
+            return IngestResponse(
+                success=True,
+                application_id=existing_email["application_id"],
+                message="Duplicate email detected, using existing application",
+                duplicate=True,
+            )
     
     # Step 2: Parse email to extract application details
     print(f"Email data received: {email_data}")
