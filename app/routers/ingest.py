@@ -134,12 +134,18 @@ async def ingest_email(
     
     # Step 4: Create application
     try:
+        print(f"🔍 CRITICAL DEBUG: About to create application with status: '{parsed.get('status', 'applied')}'")
+        print(f"🔍 CRITICAL DEBUG: parsed data keys: {list(parsed.keys())}")
+        print(f"🔍 CRITICAL DEBUG: parsed status value: '{parsed.get('status')}' (type: {type(parsed.get('status'))})")
+        
         app_data = ApplicationCreate(
             company=parsed["company"],
             position=parsed["position"],
             status=parsed.get("status", "applied"),
             notes=f"Auto-created from email. Confidence: {parsed.get('confidence', 0)}",
         )
+        
+        print(f"🔍 CRITICAL DEBUG: ApplicationCreate object status: '{app_data.status}'")
         
         application = await create_application(user_id=user_id, data=app_data)
         application_id = application["id"]
