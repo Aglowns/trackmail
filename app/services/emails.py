@@ -50,7 +50,9 @@ class EmailService:
 
                 updates = {
                     "parsed_data": updated_parsed_data,
-                    "updated_at": datetime.utcnow().isoformat()
+                    "text_body": email_data.get('text_body', existing.get('text_body')),
+                    "html_body": email_data.get('html_body', existing.get('html_body')),
+                    "received_at": email_data.get('received_at', existing.get('received_at')),
                 }
 
                 result = (

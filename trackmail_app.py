@@ -194,6 +194,7 @@ async def ingest_email(
                 'email_type': email_data.get('parsed_email_type', 'new_application'),
                 'confidence': email_data.get('parsed_confidence', 90),
                 'status': normalized_status,
+                'parsed_status': normalized_status,
                 'status_confidence': email_data.get('status_confidence'),
                 'status_indicators': email_data.get('status_indicators'),
                 'status_reasoning': email_data.get('status_reasoning'),
@@ -206,6 +207,7 @@ async def ingest_email(
         # Store email (merge parsed data into email_data)
         email_data_with_parsed = {**email_data, **parsed_data}
         email_data_with_parsed['normalized_status'] = parsed_data.get('status', 'applied')
+        email_data_with_parsed['parsed_status'] = parsed_data.get('status', 'applied')
         email_record = await email_service.store_email(email_data_with_parsed)
         
         # Process application if detected
