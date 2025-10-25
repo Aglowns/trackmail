@@ -25,41 +25,23 @@ function buildSignInCard() {
         )
         .addWidget(
           CardService.newTextParagraph()
-            .setText('To get started, you need to sign in with your TrackMail account.')
+            .setText('Click the button below to get started - no additional setup required!')
         )
     )
     .addSection(
       CardService.newCardSection()
         .addWidget(
           CardService.newTextButton()
-            .setText('Sign In with TrackMail')
+            .setText('🚀 Get Started')
             .setBackgroundColor('#667eea')
             .setOnClickAction(
               CardService.newAction()
-                .setFunctionName('openAuthPageAction')
+                .setFunctionName('openTokenPageAction')
             )
         )
         .addWidget(
           CardService.newTextParagraph()
-            .setText('<font color="#6b7280"><i>A new window will open for sign-in. After signing in, you\'ll receive a session code to paste here.</i></font>')
-        )
-    )
-    .addSection(
-      CardService.newCardSection()
-        .setHeader('Already signed in?')
-        .addWidget(
-          CardService.newTextInput()
-            .setFieldName('sessionHandle')
-            .setTitle('Session Handle')
-            .setHint('Paste your session handle here')
-        )
-        .addWidget(
-          CardService.newTextButton()
-            .setText('Save Session')
-            .setOnClickAction(
-              CardService.newAction()
-                .setFunctionName('saveSessionHandleAction')
-            )
+            .setText('<font color="#6b7280"><i>TrackMail will connect automatically and start working with your Gmail.</i></font>')
         )
     )
     .build();
@@ -77,14 +59,26 @@ function buildSignInCard() {
 function buildTrackingCard(messageId, accessToken) {
   const userEmail = getUserEmail() || 'Signed In';
   
-  // Fetch email data to preview
+  // Fetch basic email data for preview (lightweight)
   let emailPreview = '';
   let sender = '';
   let subject = '';
   let date = '';
   
   try {
+    console.log('Fetching email data for preview...');
     const emailData = fetchEmailData(messageId, accessToken);
+    
+    if (!emailData) {
+      throw new Error('No email data returned');
+    }
+    
+    console.log('Email data fetched:', {
+      has_sender: !!emailData.sender,
+      has_subject: !!emailData.subject,
+      has_html_body: !!emailData.html_body
+    });
+    
     sender = emailData.sender || 'Unknown';
     subject = emailData.subject || 'No Subject';
     
@@ -97,12 +91,90 @@ function buildTrackingCard(messageId, accessToken) {
       }
     }
     
-    emailPreview = '<b>From:</b> ' + sender + '<br>' +
+    // Use advanced AI parsing for accurate classification
+    console.log('Starting advanced AI parsing...');
+    let parsingResults;
+    try {
+      // Try ultra-accurate parsing first (with OpenAI)
+      parsingResults = ultraAccurateEmailParsing(emailData.html_body || '', subject, emailData.sender || '');
+      console.log('Advanced parsing results:', parsingResults);
+    } catch (parseError) {
+      console.error('Advanced parsing failed, using fallback:', parseError);
+      // Fallback to quick parsing
+      try {
+        parsingResults = quickEmailParsing(emailData.html_body || '', subject, emailData.sender || '');
+        console.log('Fallback parsing results:', parsingResults);
+      } catch (fallbackError) {
+        console.error('Fallback parsing also failed:', fallbackError);
+        parsingResults = {
+          company: 'Unknown Company',
+          position: 'Unknown Position',
+          emailType: 'unknown'
+        };
+      }
+    }
+    
+    // Extract data from parsing results
+    const companyName = parsingResults.company || 'Unknown Company';
+    const jobPosition = parsingResults.position || 'Unknown Position';
+    const emailType = parsingResults.emailType || 'unknown';
+    
+    // Build email preview with accurate classification
+    let emailTypeIcon = '📧';
+    let emailTypeText = 'Job Application';
+    
+    // Check for rejection first (highest priority)
+    if (emailType === 'rejected' || emailType === 'rejection') {
+      emailTypeIcon = '❌';
+      emailTypeText = 'Rejection';
+    } else if (emailType === 'interview_scheduled' || emailType === 'interview') {
+      emailTypeIcon = '📞';
+      emailTypeText = 'Interview Scheduled';
+    } else if (emailType === 'offer_received' || emailType === 'offer') {
+      emailTypeIcon = '🎉';
+      emailTypeText = 'Job Offer';
+    } else if (emailType === 'applied' || emailType === 'new_application') {
+      emailTypeIcon = '✅';
+      emailTypeText = 'Application Confirmation';
+    } else if (emailType === 'follow_up') {
+      emailTypeIcon = '📞';
+      emailTypeText = 'Follow-up';
+    } else if (emailType === 'not_job_related') {
+      emailTypeIcon = '📰';
+      emailTypeText = 'Not Job Related';
+    }
+    
+    emailPreview = '<b>' + emailTypeIcon + ' Type:</b> ' + emailTypeText + '<br>' +
+                   '<b>Company:</b> ' + companyName + '<br>' +
+                   '<b>Position:</b> ' + jobPosition + '<br>' +
+                   '<b>From:</b> ' + sender + '<br>' +
                    '<b>Subject:</b> ' + subject + '<br>' +
-                   '<b>Date:</b> ' + date;
+                   '<font color="#6b7280"><i>Click "Track This Application" or "Test Parsing" for detailed analysis</i></font>';
   } catch (error) {
     console.error('Error fetching email preview:', error);
-    emailPreview = '<font color="#991b1b">Error loading email preview</font>';
+    
+    // Fallback: try to get basic email info without complex parsing
+    try {
+      const message = GmailApp.getMessageById(messageId);
+      if (message) {
+        const basicSender = message.getFrom() || 'Unknown';
+        const basicSubject = message.getSubject() || 'No Subject';
+        
+        emailPreview = '<b>📧 Type:</b> Job Application<br>' +
+                       '<b>Company:</b> Unknown Company<br>' +
+                       '<b>Position:</b> Unknown Position<br>' +
+                       '<b>From:</b> ' + basicSender + '<br>' +
+                       '<b>Subject:</b> ' + basicSubject + '<br>' +
+                       '<font color="#6b7280"><i>Preview parsing failed - click buttons below for full analysis</i></font>';
+      } else {
+        throw new Error('Cannot access email message');
+      }
+    } catch (fallbackError) {
+      console.error('Fallback also failed:', fallbackError);
+      emailPreview = '<font color="#991b1b">Error loading email preview</font><br>' +
+                     '<font color="#6b7280"><i>Error: ' + error.message + '</i></font><br>' +
+                     '<font color="#6b7280"><i>This is normal for the first time - try the buttons below to test functionality.</i></font>';
+    }
   }
   
   const card = CardService.newCardBuilder()
@@ -172,14 +244,19 @@ function buildTrackingCard(messageId, accessToken) {
  * @return {Card} Success card
  */
 function buildSuccessCard(result) {
+  console.log('Building success card with result:', JSON.stringify(result));
+  
   let message = '✅ Application tracked successfully!';
   
-  if (result.duplicate) {
+  if (result && result.duplicate) {
     message = '✅ This email was already tracked.';
   }
   
-  let detailText = result.message || '';
-  if (result.application_id) {
+  let detailText = '';
+  if (result && result.message) {
+    detailText = result.message;
+  }
+  if (result && result.application_id) {
     detailText += '<br><br><font color="#6b7280"><i>Application ID: ' + result.application_id + '</i></font>';
   }
   
@@ -315,21 +392,48 @@ function buildErrorCard(errorMessage) {
 function buildTestResultsCard(result) {
   let resultsText = '';
   
-  if (result.parsed) {
-    resultsText = '<b>Parsing Results:</b><br><br>' +
-                  '<b>Company:</b> ' + (result.parsed.company || '<i>Not found</i>') + '<br>' +
-                  '<b>Position:</b> ' + (result.parsed.position || '<i>Not found</i>') + '<br>' +
-                  '<b>Status:</b> ' + (result.parsed.status || '<i>Not found</i>') + '<br>' +
-                  '<b>Confidence:</b> ' + (result.parsed.confidence ? (result.parsed.confidence * 100).toFixed(0) + '%' : '<i>N/A</i>');
+  // Check if we have a successful result
+  if (result.success !== false && (result.parsed || result.company || result.position)) {
+    const parsed = result.parsed || result;
+    
+    // Format email type for display
+    let emailTypeDisplay = parsed.emailType || parsed.status || '<i>Not found</i>';
+    if (emailTypeDisplay === 'rejected') {
+      emailTypeDisplay = '❌ Rejection';
+    } else if (emailTypeDisplay === 'interview_scheduled') {
+      emailTypeDisplay = '📞 Interview Scheduled';
+    } else if (emailTypeDisplay === 'offer_received') {
+      emailTypeDisplay = '🎉 Job Offer';
+    } else if (emailTypeDisplay === 'applied') {
+      emailTypeDisplay = '✅ Application Confirmation';
+    } else if (emailTypeDisplay === 'follow_up') {
+      emailTypeDisplay = '📞 Follow-up';
+    }
+    
+    resultsText = '<b>✅ Parsing Results:</b><br><br>' +
+                  '<b>Company:</b> ' + (parsed.company || '<i>Not found</i>') + '<br>' +
+                  '<b>Position:</b> ' + (parsed.position || '<i>Not found</i>') + '<br>' +
+                  '<b>Email Type:</b> ' + emailTypeDisplay + '<br>' +
+                  '<b>Confidence:</b> ' + (parsed.confidence ? parsed.confidence + '%' : '<i>N/A</i>') + '<br>' +
+                  '<b>Method:</b> ' + (parsed.method || '<i>Unknown</i>');
     
     if (result.would_create_duplicate) {
-      resultsText += '<br><br><font color="#b45309">⚠️ This email was already ingested</font>';
+      resultsText += '<br><br><font color="#b45309">⚠️ This email was already tracked</font>';
     }
   } else {
-    resultsText = '<font color="#991b1b">Failed to parse email</font>';
+    // Handle parsing failure
+    resultsText = '<font color="#991b1b">❌ Failed to parse email</font>';
+    
     if (result.message) {
-      resultsText += '<br><br>' + result.message;
+      resultsText += '<br><br><b>Error:</b> ' + result.message;
     }
+    
+    // Add troubleshooting tips
+    resultsText += '<br><br><b>💡 Troubleshooting:</b><br>' +
+                   '• Make sure this is a job application email<br>' +
+                   '• Try with a different email<br>' +
+                   '• Check your internet connection<br>' +
+                   '• The email might not contain job application information';
   }
   
   const card = CardService.newCardBuilder()
@@ -409,6 +513,81 @@ function buildAuthSuccessCard() {
               CardService.newAction()
                 .setFunctionName('onGmailMessageOpen')
             )
+        )
+    )
+    .build();
+  
+  return card;
+}
+
+/**
+ * Build settings card for authenticated users.
+ * 
+ * @param {string} userEmail - User's email address
+ * @return {Card} Settings card
+ */
+function buildSettingsCard(userEmail) {
+  const card = CardService.newCardBuilder()
+    .setHeader(
+      CardService.newCardHeader()
+        .setTitle('📧 TrackMail')
+        .setSubtitle('Settings')
+    )
+    .addSection(
+      CardService.newCardSection()
+        .setHeader('Account Information')
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<b>Signed in as:</b> ' + (userEmail || 'Unknown'))
+        )
+    )
+    .addSection(
+      CardService.newCardSection()
+        .setHeader('Actions')
+        .addWidget(
+          CardService.newTextButton()
+            .setText('Sign Out')
+            .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+            .setOnClickAction(
+              CardService.newAction()
+                .setFunctionName('signOutAction')
+            )
+        )
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<font color="#6b7280"><i>TrackMail helps you manage job applications directly from Gmail. Open any email to track it as a job application.</i></font>')
+        )
+    )
+    .build();
+  
+  return card;
+}
+
+/**
+ * Build a loading card to show while processing.
+ * 
+ * @param {string} message - Loading message to display
+ * @return {Card} Loading card
+ */
+function buildLoadingCard(message) {
+  const card = CardService.newCardBuilder()
+    .setHeader(
+      CardService.newCardHeader()
+        .setTitle('📧 TrackMail')
+        .setSubtitle('Processing...')
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<b>⏳ ' + message + '</b>')
+        )
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<font color="#6b7280"><i>Please wait while we process your request...</i></font>')
         )
     )
     .build();

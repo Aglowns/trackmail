@@ -136,16 +136,35 @@ function trackApplicationAction(e) {
       throw new Error('Failed to fetch email data');
     }
     
-    // Parse email data using the same logic as the preview (which works correctly)
-    console.log('Parsing email data using quickEmailParsing...');
-    const parsedData = quickEmailParsing(emailData.html_body, emailData.subject, emailData.sender);
-    console.log('Parsed data:', parsedData);
+    // Parse email data using advanced AI parsing for accurate results
+    console.log('Parsing email data using ultraAccurateEmailParsing...');
+    const parsedData = ultraAccurateEmailParsing(emailData.html_body, emailData.subject, emailData.sender);
+    console.log('Advanced parsed data:', parsedData);
+    
+    // Enhanced: Detect job application status using AI
+    console.log('🤖 Detecting job application status...');
+    const statusDetection = detectJobApplicationStatus(
+      emailData.html_body, 
+      emailData.subject, 
+      emailData.sender, 
+      parsedData.company, 
+      parsedData.position
+    );
+    console.log('Status detection result:', statusDetection);
     
     // Add parsed data to emailData
     emailData.parsed_company = parsedData.company;
     emailData.parsed_position = parsedData.position;
     emailData.parsed_email_type = parsedData.emailType;
     emailData.parsed_confidence = parsedData.confidence;
+    
+    // Add status detection data
+    emailData.detected_status = statusDetection.status;
+    emailData.status_confidence = statusDetection.confidence;
+    emailData.status_indicators = statusDetection.indicators;
+    emailData.status_reasoning = statusDetection.reasoning;
+    emailData.is_job_related = statusDetection.isJobRelated;
+    emailData.urgency = statusDetection.urgency;
     
     // Send to backend API with parsed data
     const result = ingestEmail(emailData);
@@ -244,8 +263,28 @@ function testParsingAction(e) {
       throw new Error('Failed to fetch email data');
     }
     
-    // Test parsing via backend API (this will handle the heavy parsing)
-    const result = testEmailParsing(emailData);
+    // Test parsing using advanced AI parsing locally
+    console.log('Testing advanced AI parsing...');
+    const parsedData = ultraAccurateEmailParsing(emailData.html_body, emailData.subject, emailData.sender);
+    console.log('Advanced parsing result:', parsedData);
+    
+    // Also test status detection
+    const statusDetection = detectJobApplicationStatus(
+      emailData.html_body, 
+      emailData.subject, 
+      emailData.sender, 
+      parsedData.company, 
+      parsedData.position
+    );
+    console.log('Status detection result:', statusDetection);
+    
+    // Combine results
+    const result = {
+      success: true,
+      parsed: parsedData,
+      status: statusDetection,
+      message: 'Advanced AI parsing completed successfully'
+    };
     
     // Show test results card
     return CardService.newActionResponseBuilder()
@@ -706,6 +745,37 @@ function debugTrackApplication() {
       return 'Failed to fetch email data';
     }
     
+    // Test advanced parsing
+    console.log('Testing advanced AI parsing...');
+    const parsedData = ultraAccurateEmailParsing(emailData.html_body, emailData.subject, emailData.sender);
+    console.log('Advanced parsing result:', parsedData);
+    
+    // Test status detection
+    const statusDetection = detectJobApplicationStatus(
+      emailData.html_body, 
+      emailData.subject, 
+      emailData.sender, 
+      parsedData.company, 
+      parsedData.position
+    );
+    console.log('Status detection result:', statusDetection);
+    
+    // Add parsed data to emailData (same as in trackApplicationAction)
+    emailData.parsed_company = parsedData.company;
+    emailData.parsed_position = parsedData.position;
+    emailData.parsed_email_type = parsedData.emailType;
+    emailData.parsed_confidence = parsedData.confidence;
+    
+    // Add status detection data
+    emailData.detected_status = statusDetection.status;
+    emailData.status_confidence = statusDetection.confidence;
+    emailData.status_indicators = statusDetection.indicators;
+    emailData.status_reasoning = statusDetection.reasoning;
+    emailData.is_job_related = statusDetection.isJobRelated;
+    emailData.urgency = statusDetection.urgency;
+    
+    console.log('Final email data being sent to backend:', JSON.stringify(emailData));
+    
     // Test ingestEmail
     const result = ingestEmail(emailData);
     console.log('Ingest result:', result);
@@ -713,12 +783,95 @@ function debugTrackApplication() {
     return {
       messageId: messageId,
       emailData: emailData,
+      parsedData: parsedData,
+      statusDetection: statusDetection,
       ingestResult: result,
       success: true
     };
     
   } catch (error) {
     console.error('Debug track application failed:', error);
+    return {
+      success: false,
+      error: error.message,
+      stack: error.stack
+    };
+  }
+}
+
+/**
+ * Test function to verify AI status detection is working
+ * This tests the complete flow from email to backend
+ */
+function testAIStatusDetection() {
+  console.log('🧪 Testing AI status detection...');
+  
+  try {
+    // Get a test message ID
+    const threads = GmailApp.getInboxThreads(0, 1);
+    if (threads.length === 0) {
+      return 'No messages found in inbox';
+    }
+    
+    const messages = threads[0].getMessages();
+    if (messages.length === 0) {
+      return 'No messages found in thread';
+    }
+    
+    const messageId = messages[0].getId();
+    console.log('Using message ID:', messageId);
+    
+    // Fetch email data
+    const emailData = fetchEmailData(messageId, 'test_token');
+    console.log('Email data:', emailData);
+    
+    if (!emailData) {
+      return 'Failed to fetch email data';
+    }
+    
+    // Test advanced parsing
+    console.log('Testing advanced AI parsing...');
+    const parsedData = ultraAccurateEmailParsing(emailData.html_body, emailData.subject, emailData.sender);
+    console.log('Advanced parsing result:', parsedData);
+    
+    // Test status detection
+    const statusDetection = detectJobApplicationStatus(
+      emailData.html_body, 
+      emailData.subject, 
+      emailData.sender, 
+      parsedData.company, 
+      parsedData.position
+    );
+    console.log('Status detection result:', statusDetection);
+    
+    // Show what would be sent to backend
+    const finalEmailData = {
+      ...emailData,
+      parsed_company: parsedData.company,
+      parsed_position: parsedData.position,
+      parsed_email_type: parsedData.emailType,
+      parsed_confidence: parsedData.confidence,
+      detected_status: statusDetection.status,
+      status_confidence: statusDetection.confidence,
+      status_indicators: statusDetection.indicators,
+      status_reasoning: statusDetection.reasoning,
+      is_job_related: statusDetection.isJobRelated,
+      urgency: statusDetection.urgency
+    };
+    
+    console.log('Final email data that would be sent to backend:', JSON.stringify(finalEmailData, null, 2));
+    
+    return {
+      messageId: messageId,
+      emailData: emailData,
+      parsedData: parsedData,
+      statusDetection: statusDetection,
+      finalEmailData: finalEmailData,
+      success: true
+    };
+    
+  } catch (error) {
+    console.error('Test AI status detection failed:', error);
     return {
       success: false,
       error: error.message,

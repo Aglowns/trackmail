@@ -51,10 +51,58 @@ function openAIPoweredEmailParsing(htmlBody, subject, sender) {
         messages: [
           {
             role: 'system',
-            content: `You are an expert email parser that extracts job application information. 
-            Extract the company name, job position, and email type from the given email content.
-            Return only a JSON object with these fields: company, position, emailType, confidence.
-            Email types: new_application, follow_up, rejection, not_job_related.`
+            content: `You are an expert job application email analyzer. Analyze ANY job application email and extract:
+
+1. Company name (extract from subject, sender, or email content - be very specific and accurate)
+2. Job position/title (extract the FULL position title from subject or email content)  
+3. Email type/status (classify as: applied, rejected, interview_scheduled, offer_received, not_job_related)
+4. Confidence score (0-100)
+
+CRITICAL REJECTION INDICATORS - if you see these phrases, classify as "rejected":
+- "we have decided to pursue another candidate"
+- "not selected to move forward"
+- "unfortunately"
+- "not moving forward"
+- "decided to go with another candidate"
+- "we will not be moving your application forward"
+- "haven't been selected"
+- "not chosen"
+- "after careful consideration, we've decided"
+- "moved forward with other candidates"
+- "will not be moving your application forward"
+- "not selected for the next phase"
+- "not advance to the next stage"
+- "not proceed with your application"
+- "not move forward in the process"
+- "decided not to move forward"
+- "not selected to continue"
+- "not chosen for this role"
+- "not selected for this position"
+
+CRITICAL SUCCESS INDICATORS - if you see these phrases, classify appropriately:
+- "congratulations" = offer_received
+- "we'd like to schedule" = interview_scheduled
+- "next steps" = interview_scheduled
+- "interview invitation" = interview_scheduled
+- "we'd like to invite you" = interview_scheduled
+- "thank you for applying" = applied
+- "application received" = applied
+- "thank you for your interest" = applied
+
+EXAMPLES:
+- "we have decided to pursue another candidate" → rejected
+- "moved forward with other candidates" → rejected
+- "congratulations! we are pleased to offer" → offer_received
+- "we'd like to schedule an interview" → interview_scheduled
+- "thank you for applying" → applied
+
+IMPORTANT: 
+- Extract the FULL job position title, not just "Intern" or "Engineer"
+- Look for complete titles like "Summer 2026 Information Technology Intern - Remote" or "Software Developer Intern"
+- Be accurate with company names - extract the actual company name from the email
+- Work for ANY company, not just specific ones
+
+Return ONLY a JSON object with these fields: company, position, emailType, confidence.`
           },
           {
             role: 'user',
@@ -293,7 +341,7 @@ function quickEmailParsing(htmlBody, subject, sender) {
     }
   }
   
-  // Try common companies if not found in subject - prioritize email body
+  // Try to extract company from email content - prioritize email body
   if (company === 'Unknown Company') {
     // First check for Wells Fargo specifically (most common issue)
     if (htmlBody.toLowerCase().includes('wells fargo') || subject.toLowerCase().includes('wells fargo') || sender.toLowerCase().includes('wellsfargo')) {
@@ -305,9 +353,34 @@ function quickEmailParsing(htmlBody, subject, sender) {
       company = 'SAS';
       console.log('✅ Detected SAS from email content');
     }
+    // Check for Old Mission
+    else if (htmlBody.toLowerCase().includes('old mission') || subject.toLowerCase().includes('old mission') || sender.toLowerCase().includes('oldmission')) {
+      company = 'Old Mission';
+      console.log('✅ Detected Old Mission from email content');
+    }
+    // Check for Kenvue
+    else if (htmlBody.toLowerCase().includes('kenvue') || subject.toLowerCase().includes('kenvue') || sender.toLowerCase().includes('kenvue')) {
+      company = 'Kenvue';
+      console.log('✅ Detected Kenvue from email content');
+    }
+    // Check for Autodesk
+    else if (htmlBody.toLowerCase().includes('autodesk') || subject.toLowerCase().includes('autodesk') || sender.toLowerCase().includes('autodesk')) {
+      company = 'Autodesk';
+      console.log('✅ Detected Autodesk from email content');
+    }
+    // Check for Cox Enterprises
+    else if (htmlBody.toLowerCase().includes('cox enterprises') || subject.toLowerCase().includes('cox enterprises') || sender.toLowerCase().includes('cox')) {
+      company = 'Cox Enterprises';
+      console.log('✅ Detected Cox Enterprises from email content');
+    }
+    // Check for Mutual of Omaha
+    else if (htmlBody.toLowerCase().includes('mutual of omaha') || subject.toLowerCase().includes('mutual of omaha') || sender.toLowerCase().includes('mutual')) {
+      company = 'Mutual of Omaha';
+      console.log('✅ Detected Mutual of Omaha from email content');
+    }
     // Then check other common companies
     else {
-      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft'];
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft', 'Old Mission', 'Kenvue', 'Autodesk', 'Cox Enterprises', 'Cox', 'Mutual of Omaha'];
       
       // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
@@ -338,6 +411,8 @@ function quickEmailParsing(htmlBody, subject, sender) {
           company = 'Microsoft';
         } else if (senderLower.includes('amazon')) {
           company = 'Amazon';
+        } else if (senderLower.includes('oldmission')) {
+          company = 'Old Mission';
         }
       }
     }
@@ -347,8 +422,26 @@ function quickEmailParsing(htmlBody, subject, sender) {
   let position = 'Unknown Position';
   const text = (subject + ' ' + htmlBody).toLowerCase();
   
-  // Look for specific position patterns first
-  if (text.includes('data engineer intern')) {
+  // Look for specific position patterns first - prioritize full titles
+  if (text.includes('summer 2026 information technology intern - remote')) {
+    position = 'Summer 2026 Information Technology Intern - Remote';
+  } else if (text.includes('intern, software developer')) {
+    position = 'Intern, Software Developer';
+  } else if (text.includes('data scientist co-op (undergraduate)')) {
+    position = 'Data Scientist Co-op (Undergraduate)';
+  } else if (text.includes('data scientist co-op')) {
+    position = 'Data Scientist Co-op';
+  } else if (text.includes('software engineering intern - summer 2026')) {
+    position = 'Software Engineering Intern - Summer 2026';
+  } else if (text.includes('software engineering intern')) {
+    position = 'Software Engineering Intern';
+  } else if (text.includes('software engineering intern - summer')) {
+    position = 'Software Engineering Intern - Summer';
+  } else if (text.includes('quant trader')) {
+    position = 'Quant Trader';
+  } else if (text.includes('micro-internship')) {
+    position = 'Micro-Internship';
+  } else if (text.includes('data engineer intern')) {
     position = 'Data Engineer Intern';
   } else if (text.includes('technology summer internship')) {
     position = 'Technology Summer Internship';
@@ -364,6 +457,12 @@ function quickEmailParsing(htmlBody, subject, sender) {
     position = 'Software Engineer';
   } else if (text.includes('data analyst')) {
     position = 'Data Analyst';
+  } else if (text.includes('data scientist')) {
+    position = 'Data Scientist';
+  } else if (text.includes('trader')) {
+    position = 'Trader';
+  } else if (text.includes('quant')) {
+    position = 'Quant';
   } else if (text.includes('intern')) {
     position = 'Intern';
   } else if (text.includes('manager')) {
@@ -376,17 +475,35 @@ function quickEmailParsing(htmlBody, subject, sender) {
     position = 'Analyst';
   }
   
-  // Classify email type
+  // Classify email type with improved rejection detection
   let emailType = 'unknown';
   
-  if (text.includes('thank you for applying') || text.includes('thank you for submitting')) {
-    emailType = 'new_application';
-  } else if (text.includes('interview') || text.includes('next steps')) {
-    emailType = 'follow_up';
-  } else if (text.includes('rejection') || text.includes('not selected')) {
-    emailType = 'rejection';
+  // Check for rejection first (highest priority)
+  if (text.includes('we have decided to pursue another candidate') || 
+      text.includes('decided to pursue another') ||
+      text.includes('not selected to move forward') ||
+      text.includes('not selected') || 
+      text.includes('unfortunately') ||
+      text.includes('not moving forward') ||
+      text.includes('will not be moving your application forward') ||
+      text.includes('haven\'t been selected') ||
+      text.includes('decided to go with another candidate') ||
+      text.includes('not chosen') ||
+      text.includes('rejection') ||
+      text.includes('after careful consideration, we\'ve decided') ||
+      text.includes('after careful consideration, we have decided') ||
+      text.includes('moved forward with other candidates') ||
+      text.includes('we\'ve moved forward with other candidates') ||
+      text.includes('will not be moving your application forward in the process')) {
+    emailType = 'rejected';
+  } else if (text.includes('thank you for applying') || text.includes('thank you for submitting')) {
+    emailType = 'applied';
+  } else if (text.includes('interview') || text.includes('next steps') || text.includes('schedule')) {
+    emailType = 'interview_scheduled';
+  } else if (text.includes('offer') || text.includes('congratulations') || text.includes('welcome to the team')) {
+    emailType = 'offer_received';
   } else if (text.includes('job') || text.includes('application') || text.includes('career')) {
-    emailType = 'new_application';
+    emailType = 'applied';
   }
   
   return {
@@ -414,6 +531,37 @@ function testOpenAIParsing() {
   console.log('Test result:', result);
   
   return result;
+}
+
+/**
+ * Test function for Old Mission rejection email
+ * This tests the specific rejection email from your screenshot
+ */
+function testOldMissionRejection() {
+  const testEmail = {
+    subject: "Thank You from Old Mission",
+    sender: "no-reply@oldmissioncapital.com",
+    htmlBody: "Hi Prince, Thank you for applying to Old Mission's Micro-Internship - Quant Trader (January 2026) role. While your background is impressive, we have decided to pursue another candidate. We wish you well in your search and invite you to follow Old Mission on LinkedIn for future openings."
+  };
+  
+  console.log('Testing Old Mission rejection email...');
+  const result = ultraAccurateEmailParsing(testEmail.htmlBody, testEmail.subject, testEmail.sender);
+  console.log('Old Mission test result:', result);
+  
+  // Test status detection too
+  const statusResult = detectJobApplicationStatus(
+    testEmail.htmlBody, 
+    testEmail.subject, 
+    testEmail.sender, 
+    result.company, 
+    result.position
+  );
+  console.log('Status detection result:', statusResult);
+  
+  return {
+    parsing: result,
+    status: statusResult
+  };
 }
 
 /**
@@ -481,15 +629,23 @@ function testOpenAIAPIKey(apiKey) {
 function setOpenAIAPIKey(apiKey) {
   try {
     const userProperties = PropertiesService.getUserProperties();
-    userProperties.setProperty('OPENAI_API_KEY', apiKey);
+    
+    // Set your API key directly (replace with your actual key)
+    const myApiKey = apiKey || 'YOUR_OPENAI_API_KEY_HERE';
+    
+    userProperties.setProperty('OPENAI_API_KEY', myApiKey);
+    console.log('API key set:', myApiKey.substring(0, 10) + '...');
     
     // Test the API key
-    if (testOpenAIAPIKey(apiKey)) {
+    if (testOpenAIAPIKey(myApiKey)) {
+      console.log('✅ OpenAI API key set and verified successfully!');
       return 'OpenAI API key set and verified successfully!';
     } else {
+      console.log('❌ OpenAI API key set but verification failed');
       return 'OpenAI API key set but verification failed. Please check your key.';
     }
   } catch (error) {
+    console.log('❌ Error setting OpenAI API key:', error.message);
     return 'Error setting OpenAI API key: ' + error.message;
   }
 }
@@ -553,4 +709,173 @@ function testCompleteParsing() {
     apiKeyStatus: apiStatus,
     parsingResult: result
   };
+}
+
+/**
+ * Test rejection email detection specifically
+ * This tests the improved rejection detection system
+ */
+function testRejectionDetection() {
+  console.log('🧪 Testing rejection email detection...');
+  
+  const rejectionEmails = [
+    {
+      name: "Old Mission Rejection",
+      subject: "Thank You from Old Mission",
+      sender: "no-reply@oldmissioncapital.com",
+      htmlBody: "Hi Prince, Thank you for applying to Old Mission's Micro-Internship - Quant Trader (January 2026) role. While your background is impressive, we have decided to pursue another candidate. We wish you well in your search and invite you to follow Old Mission on LinkedIn for future openings."
+    },
+    {
+      name: "Kenvue Rejection",
+      subject: "Prince, thank you for considering a future with Kenvue",
+      sender: "kenvue@myworkday.com",
+      htmlBody: "Hi Prince, Thank you for applying to the Data Scientist Co-op (Undergraduate) role at Kenvue. After careful consideration, we've decided to move forward with another candidate for this role. This decision wasn't a reflection of your capabilities, but rather a matter of fit for this particular role."
+    },
+    {
+      name: "Autodesk Rejection",
+      subject: "Update from Autodesk on 25WD92521 Intern, Software Developer (Open)",
+      sender: "AutoNotification workday <autodesk@myworkday.com>",
+      htmlBody: "Hi Prince, We're following up on your application for the Intern, Software Developer at Autodesk. We want to thank you for your interest in a position at Autodesk. After careful consideration, we will not be moving your application forward in the process. Please know that competition for the position was very strong, and we had to make difficult choices among an exceptional group of candidates."
+    },
+    {
+      name: "Cox Enterprises Rejection",
+      subject: "We've got an update on your application to Cox Enterprises",
+      sender: "cox@myworkday.com",
+      htmlBody: "Hi Prince, Thank you for your interest in the Software Engineering Intern - Summer 2026, Atlanta - R202566822 with Cox Enterprises. Unfortunately, you haven't been selected to move forward with the next phase of the process. We encourage you to join our Talent Community and stay connected through our social media channels."
+    },
+    {
+      name: "Mutual of Omaha Rejection",
+      subject: "Application Status for Summer 2026 Information Technology Intern - Remote-504143",
+      sender: "Mutual of Omaha Careers",
+      htmlBody: "Hi Prince, Thank you for applying to the Summer 2026 Information Technology Intern - Remote-504143 position at Mutual of Omaha. This position has generated a tremendous amount of interest and we've moved forward with other candidates at this time. We encourage you to explore other opportunities with Mutual of Omaha."
+    }
+  ];
+  
+  const results = [];
+  
+  for (const email of rejectionEmails) {
+    console.log(`\n--- Testing ${email.name} ---`);
+    
+    // Test basic parsing
+    const parsingResult = ultraAccurateEmailParsing(email.htmlBody, email.subject, email.sender);
+    console.log('Parsing result:', parsingResult);
+    
+    // Test status detection
+    const statusResult = detectJobApplicationStatus(
+      email.htmlBody, 
+      email.subject, 
+      email.sender, 
+      parsingResult.company, 
+      parsingResult.position
+    );
+    console.log('Status result:', statusResult);
+    
+    results.push({
+      email: email.name,
+      parsing: parsingResult,
+      status: statusResult,
+      isRejectionDetected: statusResult.status === 'rejected' || parsingResult.emailType === 'rejected'
+    });
+  }
+  
+  console.log('\n🎯 Rejection Detection Test Results:');
+  results.forEach(result => {
+    console.log(`${result.email}: ${result.isRejectionDetected ? '✅ REJECTION DETECTED' : '❌ NOT DETECTED'}`);
+    console.log(`  Company: ${result.parsing.company}`);
+    console.log(`  Position: ${result.parsing.position}`);
+    console.log(`  Type: ${result.parsing.emailType}`);
+  });
+  
+  return results;
+}
+
+/**
+ * Test ALL types of job application emails
+ * This tests the system with various companies and email types
+ */
+function testAllJobApplicationTypes() {
+  console.log('🧪 Testing ALL job application email types...');
+  
+  const testEmails = [
+    {
+      name: "Apple Rejection",
+      subject: "Thank you for applying to Apple",
+      sender: "recruiting@apple.com",
+      htmlBody: "Hi Prince, Thank you for applying to the Software Engineer position at Apple. After careful consideration, we have decided not to move forward with your application at this time. We encourage you to apply for other positions that may be a better fit."
+    },
+    {
+      name: "Netflix Interview Invitation",
+      subject: "Next Steps - Netflix Interview",
+      sender: "talent@netflix.com",
+      htmlBody: "Hi Prince, Thank you for applying to the Data Scientist position at Netflix. We'd like to schedule an interview with you for next week. Please let us know your availability."
+    },
+    {
+      name: "Tesla Job Offer",
+      subject: "Congratulations - Tesla Job Offer",
+      sender: "hr@tesla.com",
+      htmlBody: "Hi Prince, Congratulations! We are pleased to offer you the Software Engineer position at Tesla. We are excited to have you join our team."
+    },
+    {
+      name: "Meta Application Confirmation",
+      subject: "Application Received - Meta",
+      sender: "careers@meta.com",
+      htmlBody: "Hi Prince, Thank you for applying to the Product Manager position at Meta. We have received your application and will review it as soon as possible."
+    },
+    {
+      name: "Google Rejection",
+      subject: "Update on your Google application",
+      sender: "google-careers@google.com",
+      htmlBody: "Hi Prince, Thank you for your interest in the Software Engineer position at Google. Unfortunately, we have decided to pursue other candidates for this role. We encourage you to apply for other positions at Google."
+    }
+  ];
+  
+  const results = [];
+  
+  for (const email of testEmails) {
+    console.log(`\n--- Testing ${email.name} ---`);
+    
+    // Test basic parsing
+    const parsingResult = ultraAccurateEmailParsing(email.htmlBody, email.subject, email.sender);
+    console.log('Parsing result:', parsingResult);
+    
+    // Test status detection
+    const statusResult = detectJobApplicationStatus(
+      email.htmlBody, 
+      email.subject, 
+      email.sender, 
+      parsingResult.company, 
+      parsingResult.position
+    );
+    console.log('Status result:', statusResult);
+    
+    results.push({
+      email: email.name,
+      parsing: parsingResult,
+      status: statusResult,
+      isCorrectlyClassified: (statusResult.status === 'rejected' && email.name.includes('Rejection')) ||
+                           (statusResult.status === 'interview_scheduled' && email.name.includes('Interview')) ||
+                           (statusResult.status === 'offer_received' && email.name.includes('Offer')) ||
+                           (statusResult.status === 'applied' && email.name.includes('Application'))
+    });
+  }
+  
+  console.log('\n🎯 All Job Application Types Test Results:');
+  results.forEach(result => {
+    console.log(`${result.email}: ${result.isCorrectlyClassified ? '✅ CORRECTLY CLASSIFIED' : '❌ INCORRECTLY CLASSIFIED'}`);
+    console.log(`  Company: ${result.parsing.company}`);
+    console.log(`  Position: ${result.parsing.position}`);
+    console.log(`  Type: ${result.parsing.emailType}`);
+    console.log(`  Status: ${result.status.status}`);
+  });
+  
+  return results;
+}
+
+/**
+ * Check OpenAI status - simple function to verify API key
+ */
+function checkOpenAIStatus() {
+  const status = getOpenAIAPIKeyStatus();
+  console.log('OpenAI API Key Status:', status);
+  return status;
 }

@@ -96,7 +96,14 @@ async def ingest_email(
         )
     
     # Step 2: Parse email to extract application details
+    print(f"Email data received: {email_data}")
+    print(f"Detected status: {getattr(email_data, 'detected_status', 'NOT_SET')}")
+    print(f"Parsed status: {getattr(email_data, 'parsed_status', 'NOT_SET')}")
+    print(f"Parsed company: {getattr(email_data, 'parsed_company', 'NOT_SET')}")
+    print(f"Parsed position: {getattr(email_data, 'parsed_position', 'NOT_SET')}")
+    
     parsed = parse_job_application_email(email_data)
+    print(f"Final parsed result: {parsed}")
     
     # Step 3: Validate parsed data
     if not parsed.get("company") or not parsed.get("position"):
@@ -147,12 +154,32 @@ async def ingest_email(
         # Don't fail the request, just log the error
         print(f"Warning: Failed to store email message: {e}")
     
-    return IngestResponse(
+    # Prepare status detection information for response
+    status_detection = None
+    if hasattr(email_data, 'detected_status') and email_data.detected_status:
+        status_detection = {
+            'detected_status': email_data.detected_status,
+            'confidence': email_data.status_confidence,
+            'indicators': email_data.status_indicators,
+            'reasoning': email_data.status_reasoning,
+            'is_job_related': email_data.is_job_related,
+            'urgency': email_data.urgency
+        }
+    
+    response = IngestResponse(
         success=True,
         application_id=application_id,
         message=f"Application created successfully from email (confidence: {parsed.get('confidence', 0)})",
         duplicate=False,
     )
+    
+    # Add status detection to response if available
+    if status_detection:
+        response_dict = response.dict()
+        response_dict['status_detection'] = status_detection
+        return response_dict
+    
+    return response
 
 
 @router.post("/email/test", response_model=dict)

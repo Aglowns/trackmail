@@ -24,12 +24,16 @@ class ApplicationStatus:
     Valid application status values.
     
     These match the database enum type defined in the migration.
+    Enhanced with AI-detected status categories.
     """
     WISHLIST = "wishlist"
     APPLIED = "applied"
     SCREENING = "screening"
     INTERVIEWING = "interviewing"
+    INTERVIEW_SCHEDULED = "interview_scheduled"
+    INTERVIEW_COMPLETED = "interview_completed"
     OFFER = "offer"
+    OFFER_RECEIVED = "offer_received"
     REJECTED = "rejected"
     ACCEPTED = "accepted"
     WITHDRAWN = "withdrawn"
@@ -115,6 +119,14 @@ class EmailIngest(BaseModel):
     parsed_company: Optional[str] = Field(None, description="Pre-extracted company name")
     parsed_position: Optional[str] = Field(None, description="Pre-extracted position")
     parsed_status: Optional[str] = Field(None, description="Pre-extracted status")
+    
+    # Enhanced: AI Status Detection fields
+    detected_status: Optional[str] = Field(None, description="AI-detected job application status")
+    status_confidence: Optional[float] = Field(None, description="Confidence score for status detection (0-100)")
+    status_indicators: Optional[list[str]] = Field(None, description="Key phrases that led to status detection")
+    status_reasoning: Optional[str] = Field(None, description="AI reasoning for status detection")
+    is_job_related: Optional[bool] = Field(None, description="Whether email is job-related")
+    urgency: Optional[str] = Field(None, description="Urgency level: low, medium, high")
 
 
 class EmailResponse(BaseModel):
@@ -137,6 +149,7 @@ class IngestResponse(BaseModel):
     application_id: Optional[UUID] = Field(None, description="Created/updated application ID")
     message: str = Field(..., description="Human-readable message")
     duplicate: bool = Field(default=False, description="Whether this was a duplicate")
+    status_detection: Optional[dict] = Field(None, description="AI status detection information")
 
 
 # Pagination Schema
