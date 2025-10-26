@@ -1,3 +1,65 @@
+function buildNotJobRelatedResult(reason) {
+  return {
+    status: 'not_job_related',
+    confidence: 30,
+    indicators: [reason],
+    reasoning: reason,
+    isJobRelated: false,
+    urgency: 'low',
+    method: 'Job_Listings_Filter',
+    details: {
+      fallback: true,
+      analysisType: 'job_status_detection'
+    }
+  };
+}
+
+function isJobListingEmail(text, subject, sender) {
+  const senderLower = (sender || '').toLowerCase();
+  const subjectLower = (subject || '').toLowerCase();
+  
+  const jobAlertIndicators = [
+    'job alert',
+    'new jobs',
+    'jobs posted',
+    'job matches',
+    'matched the following jobs',
+    'top jobs',
+    'job board',
+    'career news',
+    'job opportunities',
+    'job newsletter'
+  ];
+  
+  const aggregatorDomains = [
+    'jobs2web',
+    'lensa.com',
+    'noreply.jobs',
+    'huntingtoningalls',
+    'jobvite',
+    'lever.co',
+    'greenhouse.io',
+    'smartrecruiters',
+    'icims'
+  ];
+  
+  const hasAlertPhrase = jobAlertIndicators.some(indicator => text.includes(indicator));
+  const isAggregatorSender = aggregatorDomains.some(domain => senderLower.includes(domain));
+  const hasManyLinks = (text.match(/https?:\/\//g) || []).length >= 5;
+  
+  return hasAlertPhrase || isAggregatorSender || hasManyLinks;
+}
+
+function normalizeStatusForJobListings(result, htmlBody, subject, sender) {
+  const text = (subject + ' ' + htmlBody).toLowerCase();
+  if (result.isJobRelated === false) {
+    return result;
+  }
+  if (isJobListingEmail(text, subject, sender)) {
+    return buildNotJobRelatedResult('Detected job newsletter/broadcast email');
+  }
+  return result;
+}
 /**
  * AI-Powered Job Status Detection System
  * 
@@ -131,8 +193,8 @@ Determine the job application status and provide detailed analysis.`
     const parsed = JSON.parse(aiContent);
     
     console.log('✅ AI status detection successful:', parsed);
-    
-    return {
+
+    const aiResult = {
       status: parsed.status || 'applied',
       confidence: parsed.confidence || 85,
       indicators: parsed.indicators || [],
@@ -146,6 +208,8 @@ Determine the job application status and provide detailed analysis.`
         analysisType: 'job_status_detection'
       }
     };
+
+    return normalizeStatusForJobListings(aiResult, htmlBody, subject, sender);
     
   } catch (error) {
     console.log('❌ AI status detection failed:', error.message);
@@ -161,6 +225,10 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
   console.log('🔄 Using fallback status detection...');
   
   const text = (subject + ' ' + htmlBody).toLowerCase();
+
+  if (isJobListingEmail(text, subject, sender)) {
+    return buildNotJobRelatedResult('Detected job newsletter/broadcast email');
+  }
   
   // Define status patterns with confidence levels
   const statusPatterns = {
@@ -220,19 +288,7 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
   const isJobRelated = jobRelatedKeywords.some(keyword => text.includes(keyword));
   
   if (!isJobRelated) {
-    return {
-      status: 'not_job_related',
-      confidence: 15,
-      indicators: ['Email content lacks job-related keywords'],
-      reasoning: 'The email does not appear to reference a job, application, or hiring process.',
-      isJobRelated: false,
-      urgency: 'low',
-      method: 'Fallback_Not_Job_Related',
-      details: {
-        fallback: true,
-        analysisType: 'job_status_detection'
-      }
-    };
+    return buildNotJobRelatedResult('No job-related keywords detected');
   }
   
   // Check each status pattern
@@ -261,7 +317,7 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
   else if (bestMatch.status === 'rejected') urgency = 'low';
   else if (bestMatch.status === 'interview_scheduled') urgency = 'high';
   
-  return {
+  const fallbackResult = {
     status: bestMatch.status,
     confidence: bestMatch.confidence,
     indicators: bestMatch.indicators || [],
@@ -274,6 +330,8 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
       analysisType: 'job_status_detection'
     }
   };
+
+  return normalizeStatusForJobListings(fallbackResult, htmlBody, subject, sender);
 }
 
 /**
