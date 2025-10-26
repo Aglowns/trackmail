@@ -109,7 +109,9 @@ function buildTrackingCard(messageId, accessToken) {
         parsingResults = {
           company: 'Unknown Company',
           position: 'Unknown Position',
-          emailType: 'unknown'
+          emailType: 'unknown',
+          isJobRelated: true,
+          jobUrl: null
         };
       }
     }

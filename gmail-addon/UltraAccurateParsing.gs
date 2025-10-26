@@ -535,6 +535,8 @@ function quickEmailParsing(htmlBody, subject, sender) {
     company: company,
     position: position,
     emailType: emailType,
+    isJobRelated: true,
+    jobUrl: null,
     confidence: 70,
     method: 'Quick_Pattern_Matching'
   };
