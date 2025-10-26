@@ -155,6 +155,7 @@ Return ONLY a JSON object with these fields: company, position, emailType, jobUr
       position: parsed.position || 'Unknown Position',
       emailType: parsed.emailType || 'unknown',
       jobUrl: parsed.jobUrl || null,
+      isJobRelated: true,
       confidence: parsed.confidence || 95,
       method: 'OpenAI_GPT',
       details: {
@@ -290,6 +291,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     jobURL: 'No URL',
     emailType: emailType,
     jobUrl: extractJobUrl(htmlBody),
+    isJobRelated: true,
     confidence: 80, // Increased confidence since we're using enhanced patterns
     method: 'Enhanced_Fallback_Parsing',
     details: {
