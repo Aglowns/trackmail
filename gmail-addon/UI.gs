@@ -118,13 +118,17 @@ function buildTrackingCard(messageId, accessToken) {
     const companyName = parsingResults.company || 'Unknown Company';
     const jobPosition = parsingResults.position || 'Unknown Position';
     const emailType = parsingResults.emailType || 'unknown';
+    const isJobRelated = parsingResults.isJobRelated !== false;
     
     // Build email preview with accurate classification
     let emailTypeIcon = '📧';
     let emailTypeText = 'Job Application';
     
     // Check for rejection first (highest priority)
-    if (emailType === 'rejected' || emailType === 'rejection') {
+    if (!isJobRelated || emailType === 'not_job_related') {
+      emailTypeIcon = '📰';
+      emailTypeText = 'Not Job Related';
+    } else if (emailType === 'rejected' || emailType === 'rejection') {
       emailTypeIcon = '❌';
       emailTypeText = 'Rejection';
     } else if (emailType === 'interview_scheduled' || emailType === 'interview') {
@@ -139,17 +143,17 @@ function buildTrackingCard(messageId, accessToken) {
     } else if (emailType === 'follow_up') {
       emailTypeIcon = '📞';
       emailTypeText = 'Follow-up';
-    } else if (emailType === 'not_job_related') {
-      emailTypeIcon = '📰';
-      emailTypeText = 'Not Job Related';
     }
     
     emailPreview = '<b>' + emailTypeIcon + ' Type:</b> ' + emailTypeText + '<br>' +
-                   '<b>Company:</b> ' + companyName + '<br>' +
-                   '<b>Position:</b> ' + jobPosition + '<br>' +
+                   '<b>Company:</b> ' + (isJobRelated ? companyName : 'N/A') + '<br>' +
+                   '<b>Position:</b> ' + (isJobRelated ? jobPosition : 'N/A') + '<br>' +
                    '<b>From:</b> ' + sender + '<br>' +
                    '<b>Subject:</b> ' + subject + '<br>' +
-                   '<font color="#6b7280"><i>Click "Track This Application" or "Test Parsing" for detailed analysis</i></font>';
+                   (isJobRelated
+                      ? '<font color="#6b7280"><i>Click "Track This Application" or "Test Parsing" for detailed analysis</i></font>'
+                      : '<font color="#6b7280"><i>This email does not appear to be job-related.</i></font>'
+                   );
   } catch (error) {
     console.error('Error fetching email preview:', error);
     

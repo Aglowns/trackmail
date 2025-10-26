@@ -152,19 +152,57 @@ function trackApplicationAction(e) {
     );
     console.log('Status detection result:', statusDetection);
     
-    // Add parsed data to emailData
-    emailData.parsed_company = parsedData.company;
-    emailData.parsed_position = parsedData.position;
-    emailData.parsed_email_type = parsedData.emailType;
-    emailData.parsed_confidence = parsedData.confidence;
-    
-    // Add status detection data
-    emailData.detected_status = statusDetection.status;
-    emailData.status_confidence = statusDetection.confidence;
-    emailData.status_indicators = statusDetection.indicators;
-    emailData.status_reasoning = statusDetection.reasoning;
-    emailData.is_job_related = statusDetection.isJobRelated;
-    emailData.urgency = statusDetection.urgency;
+      // Add parsed data to emailData
+      emailData.parsed_company = parsedData.company;
+      emailData.parsed_position = parsedData.position;
+      emailData.parsed_email_type = parsedData.emailType;
+      emailData.parsed_confidence = parsedData.confidence;
+      
+      // Add status detection data
+      emailData.detected_status = statusDetection.status;
+      emailData.status_confidence = statusDetection.confidence;
+      emailData.status_indicators = statusDetection.indicators;
+      emailData.status_reasoning = statusDetection.reasoning;
+      emailData.is_job_related = statusDetection.isJobRelated;
+      emailData.urgency = statusDetection.urgency;
+      
+      // If the email is not job-related, stop processing and show a friendly message
+      if (statusDetection.isJobRelated === false || statusDetection.status === 'not_job_related') {
+        console.log('ℹ️ Email is not job-related. Skipping ingestion.');
+
+        return CardService.newActionResponseBuilder()
+          .setNavigation(
+            CardService.newNavigation().updateCard(
+              CardService.newCardBuilder()
+                .setHeader(
+                  CardService.newCardHeader()
+                    .setTitle('📧 TrackMail')
+                    .setSubtitle('Not Job Related')
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newTextParagraph()
+                        .setText('<font color="#1f2937"><b>This email is not related to a job application.</b></font><br>' +
+                                 '<font color="#4b5563">You can track only emails related to job applications, interviews, offers, or status updates.</font>')
+                    )
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newTextButton()
+                        .setText('← Back')
+                        .setOnClickAction(
+                          CardService.newAction()
+                            .setFunctionName('onGmailMessageOpen')
+                        )
+                    )
+                )
+                .build()
+            )
+          )
+          .build();
+      }
     
     // Send to backend API with parsed data
     const result = ingestEmail(emailData);
@@ -760,19 +798,31 @@ function debugTrackApplication() {
     );
     console.log('Status detection result:', statusDetection);
     
-    // Add parsed data to emailData (same as in trackApplicationAction)
-    emailData.parsed_company = parsedData.company;
-    emailData.parsed_position = parsedData.position;
-    emailData.parsed_email_type = parsedData.emailType;
-    emailData.parsed_confidence = parsedData.confidence;
-    
-    // Add status detection data
-    emailData.detected_status = statusDetection.status;
-    emailData.status_confidence = statusDetection.confidence;
-    emailData.status_indicators = statusDetection.indicators;
-    emailData.status_reasoning = statusDetection.reasoning;
-    emailData.is_job_related = statusDetection.isJobRelated;
-    emailData.urgency = statusDetection.urgency;
+      // Add parsed data to emailData (same as in trackApplicationAction)
+      emailData.parsed_company = parsedData.company;
+      emailData.parsed_position = parsedData.position;
+      emailData.parsed_email_type = parsedData.emailType;
+      emailData.parsed_confidence = parsedData.confidence;
+      
+      // Add status detection data
+      emailData.detected_status = statusDetection.status;
+      emailData.status_confidence = statusDetection.confidence;
+      emailData.status_indicators = statusDetection.indicators;
+      emailData.status_reasoning = statusDetection.reasoning;
+      emailData.is_job_related = statusDetection.isJobRelated;
+      emailData.urgency = statusDetection.urgency;
+      
+      if (statusDetection.isJobRelated === false || statusDetection.status === 'not_job_related') {
+        return {
+          messageId: messageId,
+          emailData: emailData,
+          parsedData: parsedData,
+          statusDetection: statusDetection,
+          ingestResult: null,
+          success: true,
+          notJobRelated: true
+        };
+      }
     
     console.log('Final email data being sent to backend:', JSON.stringify(emailData));
     
