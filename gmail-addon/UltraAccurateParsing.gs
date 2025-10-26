@@ -1,3 +1,25 @@
+function extractJobUrl(htmlBody) {
+  if (!htmlBody) {
+    return null;
+  }
+  try {
+    const bodyLower = htmlBody.toLowerCase();
+    const linkRegex = /https?:\/\/[\w\.\-\/%\?=&#]+/gi;
+    const links = htmlBody.match(linkRegex) || [];
+
+    const jobIndicators = ['job', 'career', 'apply', 'position', 'opportunity'];
+    const filteredLinks = links.filter(link => jobIndicators.some(ind => link.toLowerCase().includes(ind)));
+
+    if (filteredLinks.length > 0) {
+      return filteredLinks[0];
+    }
+
+    return links.length > 0 ? links[0] : null;
+  } catch (error) {
+    console.log('extractJobUrl error:', error.message);
+    return null;
+  }
+}
 /**
  * AI-Powered Email Parsing System using OpenAI GPT
  * 
@@ -56,7 +78,8 @@ function openAIPoweredEmailParsing(htmlBody, subject, sender) {
 1. Company name (extract from subject, sender, or email content - be very specific and accurate)
 2. Job position/title (extract the FULL position title from subject or email content)  
 3. Email type/status (classify as: applied, rejected, interview_scheduled, offer_received, not_job_related)
-4. Confidence score (0-100)
+4. Job posting URL (if present; otherwise null)
+5. Confidence score (0-100)
 
 CRITICAL REJECTION INDICATORS - if you see these phrases, classify as "rejected":
 - "we have decided to pursue another candidate"
@@ -102,7 +125,7 @@ IMPORTANT:
 - Be accurate with company names - extract the actual company name from the email
 - Work for ANY company, not just specific ones
 
-Return ONLY a JSON object with these fields: company, position, emailType, confidence.`
+Return ONLY a JSON object with these fields: company, position, emailType, jobUrl, confidence.`
           },
           {
             role: 'user',
@@ -131,6 +154,7 @@ Return ONLY a JSON object with these fields: company, position, emailType, confi
       company: parsed.company || 'Unknown Company',
       position: parsed.position || 'Unknown Position',
       emailType: parsed.emailType || 'unknown',
+      jobUrl: parsed.jobUrl || null,
       confidence: parsed.confidence || 95,
       method: 'OpenAI_GPT',
       details: {
@@ -265,6 +289,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     applicationDate: 'Unknown Date',
     jobURL: 'No URL',
     emailType: emailType,
+    jobUrl: extractJobUrl(htmlBody),
     confidence: 80, // Increased confidence since we're using enhanced patterns
     method: 'Enhanced_Fallback_Parsing',
     details: {

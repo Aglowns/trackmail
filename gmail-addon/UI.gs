@@ -148,6 +148,10 @@ function buildTrackingCard(messageId, accessToken) {
     emailPreview = '<b>' + emailTypeIcon + ' Type:</b> ' + emailTypeText + '<br>' +
                    '<b>Company:</b> ' + (isJobRelated ? companyName : 'N/A') + '<br>' +
                    '<b>Position:</b> ' + (isJobRelated ? jobPosition : 'N/A') + '<br>' +
+                   (parsingResults.jobUrl && isJobRelated
+                      ? ('<b>Job Link:</b> <a href="' + parsingResults.jobUrl + '" target="_blank">Open Posting</a><br>')
+                      : ''
+                   ) +
                    '<b>From:</b> ' + sender + '<br>' +
                    '<b>Subject:</b> ' + subject + '<br>' +
                    (isJobRelated
