@@ -64,6 +64,8 @@ function buildTrackingCard(messageId, accessToken) {
   let sender = '';
   let subject = '';
   let date = '';
+  let parsingResults = null;
+  let isJobRelated = true;
   
   try {
     console.log('Fetching email data for preview...');
@@ -93,7 +95,6 @@ function buildTrackingCard(messageId, accessToken) {
     
     // Use advanced AI parsing for accurate classification
     console.log('Starting advanced AI parsing...');
-    let parsingResults;
     try {
       // Try ultra-accurate parsing first (with OpenAI)
       parsingResults = ultraAccurateEmailParsing(emailData.html_body || '', subject, emailData.sender || '');
@@ -120,7 +121,7 @@ function buildTrackingCard(messageId, accessToken) {
     const companyName = parsingResults.company || 'Unknown Company';
     const jobPosition = parsingResults.position || 'Unknown Position';
     const emailType = parsingResults.emailType || 'unknown';
-    const isJobRelated = parsingResults.isJobRelated !== false && emailType !== 'not_job_related';
+    isJobRelated = parsingResults.isJobRelated !== false && emailType !== 'not_job_related';
     
     // Build email preview with accurate classification
     let emailTypeIcon = '📧';
