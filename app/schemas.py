@@ -120,6 +120,7 @@ class EmailIngest(BaseModel):
     parsed_company: Optional[str] = Field(None, description="Pre-extracted company name")
     parsed_position: Optional[str] = Field(None, description="Pre-extracted position")
     parsed_status: Optional[str] = Field(None, description="Pre-extracted status")
+    parsed_job_url: Optional[str] = Field(None, description="Pre-extracted job posting URL")
     
     # Enhanced: AI Status Detection fields
     detected_status: Optional[str] = Field(None, description="AI-detected job application status")

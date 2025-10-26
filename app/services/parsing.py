@@ -313,11 +313,17 @@ def parse_job_application_email(email_data: EmailIngest) -> dict:
         print(f"Using content analysis status: {status}")
     
     # Build result
+    email_source_url = None
+    if hasattr(email_data, 'job_url') and email_data.job_url:
+        email_source_url = email_data.job_url
+    elif hasattr(email_data, 'parsed_job_url') and email_data.parsed_job_url:
+        email_source_url = email_data.parsed_job_url
+
     parsed = {
         "company": company,
         "position": position,
         "status": status,
-        "source_url": getattr(email_data, 'job_url', None) or getattr(email_data, 'parsed_job_url', None)
+        "source_url": email_source_url
     }
     
     # Calculate confidence
