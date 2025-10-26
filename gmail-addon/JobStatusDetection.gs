@@ -17,7 +17,20 @@ function buildNotJobRelatedResult(reason) {
 function isJobListingEmail(text, subject, sender) {
   const senderLower = (sender || '').toLowerCase();
   const subjectLower = (subject || '').toLowerCase();
-  
+
+  const explicitApplicationPhrases = [
+    'thank you for applying',
+    'we have received your application',
+    'application received',
+    'update on your application',
+    'application status',
+    'reviewing your application'
+  ];
+
+  if (explicitApplicationPhrases.some(phrase => text.includes(phrase))) {
+    return false;
+  }
+
   const jobAlertIndicators = [
     'job alert',
     'new jobs',
@@ -30,7 +43,7 @@ function isJobListingEmail(text, subject, sender) {
     'job opportunities',
     'job newsletter'
   ];
-  
+
   const aggregatorDomains = [
     'jobs2web',
     'lensa.com',
@@ -39,15 +52,18 @@ function isJobListingEmail(text, subject, sender) {
     'jobvite',
     'lever.co',
     'greenhouse.io',
-    'smartrecruiters',
-    'icims'
+    'smartrecruiters'
   ];
-  
+
   const hasAlertPhrase = jobAlertIndicators.some(indicator => text.includes(indicator));
   const isAggregatorSender = aggregatorDomains.some(domain => senderLower.includes(domain));
   const hasManyLinks = (text.match(/https?:\/\//g) || []).length >= 5;
-  
-  return hasAlertPhrase || isAggregatorSender || hasManyLinks;
+
+  return (
+    (hasAlertPhrase && (isAggregatorSender || hasManyLinks)) ||
+    (hasAlertPhrase && senderLower.includes('jobs2web')) ||
+    (hasManyLinks && senderLower.includes('jobs2web'))
+  );
 }
 
 function normalizeStatusForJobListings(result, htmlBody, subject, sender) {
