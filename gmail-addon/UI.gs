@@ -118,7 +118,7 @@ function buildTrackingCard(messageId, accessToken) {
     const companyName = parsingResults.company || 'Unknown Company';
     const jobPosition = parsingResults.position || 'Unknown Position';
     const emailType = parsingResults.emailType || 'unknown';
-    const isJobRelated = parsingResults.isJobRelated !== false;
+    const isJobRelated = parsingResults.isJobRelated !== false && parsingResults.emailType !== 'not_job_related';
     
     // Build email preview with accurate classification
     let emailTypeIcon = '📧';
