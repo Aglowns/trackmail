@@ -181,6 +181,52 @@ function buildTrackingCard(messageId, accessToken) {
     }
   }
   
+  const actionsSection = CardService.newCardSection().setHeader('Actions');
+
+  if (isJobRelated) {
+    actionsSection
+      .addWidget(
+        CardService.newTextButton()
+          .setText('📌 Track This Application')
+          .setBackgroundColor('#667eea')
+          .setOnClickAction(
+            CardService.newAction()
+              .setFunctionName('trackApplicationAction')
+              .setParameters({
+                'messageId': messageId,
+                'accessToken': accessToken
+              })
+          )
+      )
+      .addWidget(
+        CardService.newTextButton()
+          .setText('🔍 Test Parsing')
+          .setOnClickAction(
+            CardService.newAction()
+              .setFunctionName('testParsingAction')
+              .setParameters({
+                'messageId': messageId,
+                'accessToken': accessToken
+              })
+          )
+      );
+  } else {
+    actionsSection
+      .addWidget(
+        CardService.newTextParagraph()
+          .setText('<font color="#1f2937"><b>This email is not related to a job application.</b></font><br>' +
+                   '<font color="#4b5563">No further action is needed.</font>')
+      )
+      .addWidget(
+        CardService.newTextButton()
+          .setText('🔄 Refresh')
+          .setOnClickAction(
+            CardService.newAction()
+              .setFunctionName('onGmailMessageOpen')
+          )
+      );
+  }
+
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
@@ -195,35 +241,7 @@ function buildTrackingCard(messageId, accessToken) {
             .setText(emailPreview)
         )
     )
-    .addSection(
-      CardService.newCardSection()
-        .setHeader('Actions')
-        .addWidget(
-          CardService.newTextButton()
-            .setText('📌 Track This Application')
-            .setBackgroundColor('#667eea')
-            .setOnClickAction(
-              CardService.newAction()
-                .setFunctionName('trackApplicationAction')
-                .setParameters({
-                  'messageId': messageId,
-                  'accessToken': accessToken
-                })
-            )
-        )
-        .addWidget(
-          CardService.newTextButton()
-            .setText('🔍 Test Parsing')
-            .setOnClickAction(
-              CardService.newAction()
-                .setFunctionName('testParsingAction')
-                .setParameters({
-                  'messageId': messageId,
-                  'accessToken': accessToken
-                })
-            )
-        )
-    )
+    .addSection(actionsSection)
     .addSection(
       CardService.newCardSection()
         .addWidget(
