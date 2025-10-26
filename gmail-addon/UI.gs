@@ -121,6 +121,9 @@ function buildTrackingCard(messageId, accessToken) {
     const companyName = parsingResults.company || 'Unknown Company';
     const jobPosition = parsingResults.position || 'Unknown Position';
     const emailType = parsingResults.emailType || 'unknown';
+    jobUrl = normalizeJobUrl(
+      parsingResults.jobUrl || parsingResults.job_url || parsingResults.jobURL
+    );
     isJobRelated = parsingResults.isJobRelated !== false && emailType !== 'not_job_related';
     
     // Build email preview with accurate classification
@@ -151,8 +154,8 @@ function buildTrackingCard(messageId, accessToken) {
     emailPreview = '<b>' + emailTypeIcon + ' Type:</b> ' + emailTypeText + '<br>' +
                    '<b>Company:</b> ' + (isJobRelated ? companyName : 'N/A') + '<br>' +
                    '<b>Position:</b> ' + (isJobRelated ? jobPosition : 'N/A') + '<br>' +
-                   (parsingResults.jobUrl && isJobRelated
-                      ? ('<b>Job Link:</b> <a href="' + parsingResults.jobUrl + '" target="_blank">Open Posting</a><br>')
+                   (jobUrl && isJobRelated
+                      ? ('<b>Job Link:</b> <a href="' + jobUrl + '" target="_blank">Open Posting</a><br>')
                       : ''
                    ) +
                    '<b>From:</b> ' + sender + '<br>' +

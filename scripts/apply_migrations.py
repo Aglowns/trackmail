@@ -24,7 +24,38 @@ import sys
 from pathlib import Path
 
 import psycopg
+from psycopg.rows import dict_row
 from dotenv import load_dotenv
+
+
+def ensure_migrations_table(conn: psycopg.Connection) -> None:
+    with conn.cursor() as cursor:
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS migration_history (
+                id SERIAL PRIMARY KEY,
+                filename TEXT NOT NULL UNIQUE,
+                applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+            );
+            """
+        )
+        conn.commit()
+
+
+def get_applied_migrations(conn: psycopg.Connection) -> set[str]:
+    with conn.cursor(row_factory=dict_row) as cursor:
+        cursor.execute("SELECT filename FROM migration_history")
+        rows = cursor.fetchall()
+    return {row["filename"] for row in rows}
+
+
+def record_migration(conn: psycopg.Connection, filename: str) -> None:
+    with conn.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO migration_history (filename) VALUES (%s) ON CONFLICT DO NOTHING",
+            (filename,),
+        )
+        conn.commit()
 
 
 def get_migration_files(migrations_dir: Path) -> list[Path]:
@@ -131,8 +162,17 @@ def main() -> int:
     
     # Run each migration
     try:
+        ensure_migrations_table(conn)
+        applied = get_applied_migrations(conn)
+
         for migration_file in migration_files:
+            if migration_file.name in applied:
+                print(f"⏭️  Skipping {migration_file.name} (already applied)")
+                print()
+                continue
+
             run_migration(conn, migration_file)
+            record_migration(conn, migration_file.name)
             print()
         
         # Commit changes

@@ -11,11 +11,24 @@ Key features we use:
 - Async support for better performance
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import applications, events, health, ingest
+from app.routers import applications, events, ingest, health, profiles
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):  # noqa: D401
+    """Manage application startup and shutdown."""
+    print(f"🚀 TrackMail API starting in {settings.environment} mode")
+    print("📝 Docs available at /docs")
+    try:
+        yield
+    finally:
+        print("👋 TrackMail API shutting down")
 
 # Create FastAPI application instance
 app = FastAPI(
@@ -25,6 +38,7 @@ app = FastAPI(
     # OpenAPI documentation configuration
     docs_url="/docs",  # Swagger UI
     redoc_url="/redoc",  # ReDoc alternative UI
+    lifespan=lifespan,
 )
 
 # Configure CORS (Cross-Origin Resource Sharing)
@@ -55,6 +69,7 @@ app.include_router(health.router, prefix="/v1", tags=["Health"])
 app.include_router(applications.router, prefix="/v1", tags=["Applications"])
 app.include_router(events.router, prefix="/v1", tags=["Events"])
 app.include_router(ingest.router, prefix="/v1", tags=["Email Ingestion"])
+app.include_router(profiles.router, prefix="/v1", tags=["Profiles"])
 
 
 # Root endpoint - provides basic API information
@@ -77,35 +92,4 @@ async def root() -> dict[str, str]:
         "docs": "/docs",
         "health": "/health",
     }
-
-
-# Optional: Startup and shutdown events
-# These are useful for initializing/cleaning up resources
-
-@app.on_event("startup")
-async def startup_event() -> None:
-    """
-    Run when the application starts.
-    
-    Useful for:
-    - Initializing database connections
-    - Loading ML models
-    - Starting background tasks
-    - Verifying configuration
-    """
-    print(f"🚀 TrackMail API starting in {settings.environment} mode")
-    print(f"📝 Docs available at /docs")
-
-
-@app.on_event("shutdown")
-async def shutdown_event() -> None:
-    """
-    Run when the application shuts down.
-    
-    Useful for:
-    - Closing database connections
-    - Saving state
-    - Cleaning up resources
-    """
-    print("👋 TrackMail API shutting down")
 

@@ -60,19 +60,8 @@ class PaginationParams:
 class FilterParams:
     """
     Reusable filter parameters for applications.
-    
-    Use this dependency for filtering application lists:
-    
-    @router.get("/applications")
-    async def list_applications(
-        filters: FilterParams = Depends(),
-        user_id: str = Depends(get_current_user_id)
-    ):
-        status = filters.status
-        company = filters.company
-        ...
     """
-    
+
     def __init__(
         self,
         status: Annotated[
@@ -87,18 +76,35 @@ class FilterParams:
             str | None,
             Query(description="Filter by position title (partial match)")
         ] = None,
+        source: Annotated[
+            str | None,
+            Query(description="Filter by application source")
+        ] = None,
+        confidence: Annotated[
+            str | None,
+            Query(description="Filter by confidence level")
+        ] = None,
+        date_from: Annotated[
+            str | None,
+            Query(description="Filter applications applied on/after this date (ISO format)")
+        ] = None,
+        date_to: Annotated[
+            str | None,
+            Query(description="Filter applications applied on/before this date (ISO format)")
+        ] = None,
+        search: Annotated[
+            str | None,
+            Query(description="Search company or position")
+        ] = None,
     ):
-        """
-        Initialize filter parameters.
-        
-        Args:
-            status: Filter by application status
-            company: Filter by company name (case-insensitive partial match)
-            position: Filter by position title (case-insensitive partial match)
-        """
         self.status = status
         self.company = company
         self.position = position
+        self.source = source
+        self.confidence = confidence
+        self.date_from = date_from
+        self.date_to = date_to
+        self.search = search
 
 
 # Dependency examples for future use:

@@ -14,20 +14,56 @@
 function ingestEmail(emailData) {
   try {
     console.log('Ingesting email:', emailData.subject);
+    console.log('Email data being sent:', JSON.stringify(emailData));
     
     const response = makeAuthenticatedRequest('/ingest/email', {
       method: 'post',
-      payload: JSON.stringify(emailData)
+      payload: emailData  // Don't stringify here - let makeAuthenticatedRequest handle it
     });
     
     console.log('Ingest response:', JSON.stringify(response));
-    return response;
+    
+    // Ensure response has proper structure
+    if (response && typeof response === 'object') {
+      // If response doesn't have success property, add it
+      if (response.success === undefined) {
+        response.success = true;
+      }
+      return response;
+    } else {
+      // If response is not an object, wrap it
+      return {
+        success: true,
+        message: 'Application tracked successfully',
+        response: response
+      };
+    }
     
   } catch (error) {
     console.error('Error ingesting email:', error);
+    
+    // Check if it's a timeout or connection error
+    if (error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('unavailable')) {
+      return {
+        success: false,
+        message: 'Backend service is temporarily unavailable. Please try again in a few moments.',
+        error_type: 'service_unavailable'
+      };
+    }
+    
+    // Check if it's an authentication error
+    if (error.message.includes('Authentication') || error.message.includes('401')) {
+      return {
+        success: false,
+        message: 'Authentication expired. Please sign in again.',
+        error_type: 'auth_expired'
+      };
+    }
+    
     return {
       success: false,
-      message: error.message || 'Failed to ingest email'
+      message: error.message || 'Failed to ingest email',
+      error_type: 'general_error'
     };
   }
 }
@@ -41,10 +77,11 @@ function ingestEmail(emailData) {
 function testEmailParsing(emailData) {
   try {
     console.log('Testing email parsing');
+    console.log('Email data being sent:', JSON.stringify(emailData));
     
     const response = makeAuthenticatedRequest('/ingest/email/test', {
       method: 'post',
-      payload: JSON.stringify(emailData)
+      payload: emailData  // Don't stringify here - let makeAuthenticatedRequest handle it
     });
     
     console.log('Test response:', JSON.stringify(response));
@@ -52,6 +89,26 @@ function testEmailParsing(emailData) {
     
   } catch (error) {
     console.error('Error testing email parsing:', error);
+    
+    // If backend fails, try local parsing as fallback
+    console.log('Backend parsing failed, trying local parsing...');
+    try {
+      const localResult = quickEmailParsing(
+        emailData.html_body || '', 
+        emailData.subject || '', 
+        emailData.sender || ''
+      );
+      
+      return {
+        success: true,
+        parsed: localResult,
+        message: 'Parsed locally (backend unavailable)',
+        method: 'Local_Fallback'
+      };
+    } catch (localError) {
+      console.error('Local parsing also failed:', localError);
+    }
+    
     return {
       success: false,
       message: error.message || 'Failed to test parsing',
@@ -127,7 +184,7 @@ function createApplication(applicationData) {
     
     const response = makeAuthenticatedRequest('/applications', {
       method: 'post',
-      payload: JSON.stringify(applicationData)
+      payload: applicationData  // Don't stringify here
     });
     
     return response;
@@ -154,7 +211,7 @@ function updateApplication(applicationId, updateData) {
     
     const response = makeAuthenticatedRequest('/applications/' + applicationId, {
       method: 'patch',
-      payload: JSON.stringify(updateData)
+      payload: updateData  // Don't stringify here
     });
     
     return response;
@@ -233,7 +290,7 @@ function addApplicationEvent(applicationId, eventData) {
       '/applications/' + applicationId + '/events',
       {
         method: 'post',
-        payload: JSON.stringify(eventData)
+        payload: eventData  // Don't stringify here
       }
     );
     
@@ -279,5 +336,26 @@ function checkBackendHealth() {
       error: error.message
     };
   }
+}
+
+/**
+ * Test function to debug API calls
+ * This can be called manually to test the backend integration
+ */
+function testBackendConnection() {
+  console.log('Testing backend connection...');
+  
+  // Test health endpoint
+  const health = checkBackendHealth();
+  console.log('Health check:', health);
+  
+  // Test authentication
+  const token = getAccessToken();
+  console.log('Access token available:', !!token);
+  
+  return {
+    health: health,
+    authenticated: !!token
+  };
 }
 

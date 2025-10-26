@@ -1,20 +1,82 @@
+function normalizeJobUrl(jobUrl) {
+  if (!jobUrl) {
+    return null;
+  }
+
+  try {
+    let value = jobUrl;
+    if (typeof value !== 'string') {
+      value = String(value);
+    }
+
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return null;
+    }
+
+    const lower = trimmed.toLowerCase();
+    if (lower === 'null' || lower === 'undefined' || lower === 'none' || lower === '#') {
+      return null;
+    }
+
+    if (lower.startsWith('mailto:')) {
+      return null;
+    }
+
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+
+    if (trimmed.startsWith('www.')) {
+      return 'https://' + trimmed;
+    }
+
+    return null;
+  } catch (error) {
+    console.log('normalizeJobUrl error:', error.message);
+    return null;
+  }
+}
+
 function extractJobUrl(htmlBody) {
   if (!htmlBody) {
     return null;
   }
   try {
-    const bodyLower = htmlBody.toLowerCase();
-    const linkRegex = /https?:\/\/[\w\.\-\/%\?=&#]+/gi;
+    const linkRegex = /https?:\/\/[\w\.\-\/\%\?=&#]+/gi;
     const links = htmlBody.match(linkRegex) || [];
 
-    const jobIndicators = ['job', 'career', 'apply', 'position', 'opportunity'];
-    const filteredLinks = links.filter(link => jobIndicators.some(ind => link.toLowerCase().includes(ind)));
-
-    if (filteredLinks.length > 0) {
-      return filteredLinks[0];
+    if (links.length === 0) {
+      return null;
     }
 
-    return links.length > 0 ? links[0] : null;
+    const jobIndicators = ['job', 'career', 'apply', 'position', 'opportunity'];
+    const prioritized = [];
+    const fallback = [];
+
+    for (const link of links) {
+      const normalized = normalizeJobUrl(link);
+      if (!normalized) {
+        continue;
+      }
+      const lower = normalized.toLowerCase();
+      const hasIndicator = jobIndicators.some(ind => lower.includes(ind));
+      if (hasIndicator) {
+        prioritized.push(normalized);
+      } else {
+        fallback.push(normalized);
+      }
+    }
+
+    if (prioritized.length > 0) {
+      return prioritized[0];
+    }
+
+    if (fallback.length > 0) {
+      return fallback[0];
+    }
+
+    return null;
   } catch (error) {
     console.log('extractJobUrl error:', error.message);
     return null;
@@ -154,7 +216,7 @@ Return ONLY a JSON object with these fields: company, position, emailType, jobUr
       company: parsed.company || 'Unknown Company',
       position: parsed.position || 'Unknown Position',
       emailType: parsed.emailType || 'unknown',
-      jobUrl: parsed.jobUrl || null,
+      jobUrl: normalizeJobUrl(parsed.jobUrl),
       isJobRelated: true,
       confidence: parsed.confidence || 95,
       method: 'OpenAI_GPT',
@@ -290,7 +352,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     applicationDate: 'Unknown Date',
     jobURL: 'No URL',
     emailType: emailType,
-    jobUrl: extractJobUrl(htmlBody),
+    jobUrl: normalizeJobUrl(extractJobUrl(htmlBody)),
     isJobRelated: true,
     confidence: 80, // Increased confidence since we're using enhanced patterns
     method: 'Enhanced_Fallback_Parsing',

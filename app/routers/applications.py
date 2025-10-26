@@ -12,7 +12,8 @@ All endpoints require authentication via JWT token.
 Row-Level Security ensures users only access their own data.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi.responses import StreamingResponse
 
 from app.deps import CurrentUserId, FilterParams, PaginationParams
 from app.schemas import (
@@ -65,6 +66,11 @@ async def list_applications(
         status=filters.status,
         company=filters.company,
         position=filters.position,
+        source=filters.source,
+        confidence=filters.confidence,
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        search=filters.search,
     )
     
     return PaginatedResponse(
@@ -219,4 +225,73 @@ async def delete_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found"
         )
+
+
+@router.get("/status-groups")
+async def applications_by_status(user_id: CurrentUserId) -> dict[str, list[dict]]:
+    """Return applications grouped by status for kanban views."""
+    return await app_service.get_applications_grouped_by_status(user_id)
+
+
+@router.get("/export")
+async def export_applications(
+    user_id: CurrentUserId,
+    filters: FilterParams = Depends(),
+) -> StreamingResponse:
+    """Export applications as CSV respecting current filters."""
+    csv_data = await app_service.export_applications_to_csv(
+        user_id=user_id,
+        status=filters.status,
+        company=filters.company,
+        position=filters.position,
+        source=filters.source,
+        confidence=filters.confidence,
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        search=filters.search,
+    )
+    return StreamingResponse(
+        iter([csv_data]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=applications.csv",
+        },
+    )
+
+
+@router.put("/bulk-update", response_model=list[ApplicationResponse])
+async def bulk_update_applications(
+    updates: list[dict],
+    user_id: CurrentUserId,
+) -> list[ApplicationResponse]:
+    """Bulk update applications (used for drag-and-drop reorder)."""
+    result = await app_service.bulk_update_applications(user_id=user_id, updates=updates)
+    return [ApplicationResponse(**record) for record in result]
+
+
+@router.get("/analytics/overview")
+async def get_analytics_overview(user_id: CurrentUserId) -> dict:
+    """Get analytics overview data for dashboard."""
+    return await app_service.get_analytics_overview(user_id)
+
+
+@router.get("/analytics/trends")
+async def get_analytics_trends(
+    user_id: CurrentUserId,
+    days: int = 30
+) -> dict:
+    """Get application trends over time."""
+    return await app_service.get_analytics_trends(user_id, days)
+
+
+@router.get("/analytics/companies")
+async def get_analytics_companies(user_id: CurrentUserId) -> dict:
+    """Get company analytics data."""
+    return await app_service.get_analytics_companies(user_id)
+
+
+@router.get("/analytics/sources")
+async def get_analytics_sources(user_id: CurrentUserId) -> dict:
+    """Get application source analytics."""
+    return await app_service.get_analytics_sources(user_id)
 

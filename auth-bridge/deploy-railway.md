@@ -1,93 +1,121 @@
-# Railway Deployment Instructions
+# 🚀 Deploy Auth Bridge to Railway
 
-## Current Status
-✅ Railway CLI installed
-✅ Logged in to Railway
-✅ Project "trackmail" created
+Quick deployment guide for the TrackMail Auth Bridge service.
 
-## Next Steps
+## Prerequisites
 
-### 1. Set Environment Variables
+- Railway account (free tier available)
+- GitHub repository with TrackMail code
+- Supabase credentials
 
-You need to set your Supabase credentials. Replace the values below with your actual credentials:
+## Step 1: Create Railway Project
 
-```bash
-# Set Supabase URL
-railway variables set SUPABASE_URL=https://your-project.supabase.co
+1. Go to [Railway.app](https://railway.app)
+2. Click "New Project"
+3. Select "Deploy from GitHub repo"
+4. Choose your `trackmail` repository
+5. **Important**: Set the root directory to `auth-bridge`
 
-# Set Supabase Anon Key
-railway variables set SUPABASE_ANON_KEY=your-anon-key-here
-```
+## Step 2: Configure Environment Variables
 
-### 2. Deploy the Service
-
-```bash
-railway up
-```
-
-This will:
-- Package your code
-- Upload to Railway
-- Build the Docker container
-- Deploy the service
-- Provide you with a URL
-
-### 3. Get Your Deployment URL
+In the Railway dashboard, go to your project → Variables tab and add:
 
 ```bash
-# Check deployment status
-railway status
-
-# Get the URL (or check Railway dashboard)
-railway domain
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+PORT=8001
+SESSION_TTL_SECONDS=3600
+TOKEN_TTL_SECONDS=300
 ```
 
-### 4. Test Your Deployment
+## Step 3: Deploy
 
-Once deployed, open the URL in your browser. You should see the TrackMail sign-in page.
+Railway will automatically:
+- Install Python dependencies from `requirements.txt`
+- Start the FastAPI application
+- Generate a public URL
 
-## Finding Your Supabase Credentials
+## Step 4: Test Deployment
 
-1. Go to: https://app.supabase.com
-2. Select your project
-3. Click on **Settings** (gear icon) in the left sidebar
-4. Click **API**
-5. You'll find:
-   - **Project URL**: This is your `SUPABASE_URL`
-   - **anon/public key**: This is your `SUPABASE_ANON_KEY`
+Visit your Railway URL + `/health`:
+```
+https://your-project.up.railway.app/health
+```
+
+Should return:
+```json
+{
+  "status": "healthy",
+  "active_sessions": 0,
+  "supabase_configured": true
+}
+```
+
+## Step 5: Update Gmail Add-on
+
+Update the `AUTH_BRIDGE_URL` in your Gmail Add-on files:
+
+```javascript
+// In gmail-addon/Auth.gs
+const AUTH_BRIDGE_URL = 'https://your-project.up.railway.app';
+```
 
 ## Troubleshooting
 
-### "Project not found"
-Run: `railway init` and select your project
+### Common Issues
 
-### "Not logged in"
-Run: `railway login` and authenticate in browser
+**"Supabase not configured"**
+- Check environment variables are set correctly
+- Verify Supabase URL and keys are valid
 
-### "Build failed"
-Check Railway dashboard for build logs
+**"Port binding error"**
+- Railway automatically sets PORT environment variable
+- Don't override it manually
 
-### Need to see logs
-Run: `railway logs`
+**"Module not found"**
+- Check `requirements.txt` includes all dependencies
+- Railway installs from this file automatically
 
-## Alternative: Using Railway Dashboard
+### Debug Commands
 
-1. Go to: https://railway.app/dashboard
-2. Select your "trackmail" project
-3. Click "New Service" → "Empty Service"
-4. Name it: "auth-bridge"
-5. In the service:
-   - Click "Variables" tab
-   - Add: `SUPABASE_URL` and `SUPABASE_ANON_KEY`
-   - Click "Settings" tab
-   - Connect to GitHub (or use CLI deployment)
+```bash
+# Check if service is running
+curl https://your-project.up.railway.app/health
 
-## What's Next After Deployment?
+# Test session creation (requires Supabase auth)
+curl -X POST https://your-project.up.railway.app/session/start \
+  -H "Content-Type: application/json" \
+  -d '{"access_token":"...","refresh_token":"...","user_email":"test@example.com","user_id":"123"}'
+```
 
-Once deployed, you'll receive a URL like:
-`https://auth-bridge-production-xxxx.up.railway.app`
+## Production Considerations
 
-Save this URL! You'll need it for the Gmail Add-on configuration.
+### Security
+- Sessions are stored in-memory (resets on restart)
+- For production, consider Redis for session storage
+- Rate limiting is built-in (20 requests/minute per session)
 
-Then proceed to **Step 2** in the main deployment guide: Creating the Gmail Add-on.
+### Scaling
+- Railway auto-scales based on traffic
+- Free tier includes 500 hours/month
+- Upgrade for higher limits if needed
 
+### Monitoring
+- Check Railway dashboard for logs
+- Monitor `/health` endpoint
+- Set up alerts for downtime
+
+## Next Steps
+
+1. ✅ Deploy Auth Bridge to Railway
+2. ✅ Test health endpoint
+3. ✅ Update Gmail Add-on URLs
+4. ✅ Deploy Gmail Add-on to Apps Script
+5. ✅ Test complete authentication flow
+
+---
+
+**Your Auth Bridge is now live!** 🚀
+
+The Gmail Add-on can now authenticate users through this service.

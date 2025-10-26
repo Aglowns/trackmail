@@ -12,10 +12,10 @@ Benefits:
 """
 
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Any
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr, ConfigDict
 
 
 # Application Status Enum
@@ -66,16 +66,33 @@ class ApplicationUpdate(BaseModel):
     notes: Optional[str] = None
 
 
+class ProfileBase(BaseModel):
+    full_name: Optional[str] = None
+    profession: Optional[str] = None
+    phone: Optional[str] = None
+    notification_email: Optional[str] = None
+    job_preferences: Optional[dict[str, Any]] = None
+
+
+class ProfileResponse(ProfileBase):
+    id: UUID
+    email: EmailStr
+    created_at: datetime
+    updated_at: datetime
+
+
+class ProfileUpdate(ProfileBase):
+    pass
+
+
 class ApplicationResponse(ApplicationBase):
     """Schema for application responses."""
     id: UUID
     user_id: UUID
     created_at: datetime
     updated_at: datetime
-    
-    class Config:
-        """Pydantic configuration."""
-        from_attributes = True  # Allow creation from ORM objects
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Event Schemas
@@ -96,10 +113,8 @@ class EventResponse(BaseModel):
     notes: Optional[str]
     metadata: Optional[dict]
     created_at: datetime
-    
-    class Config:
-        """Pydantic configuration."""
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 # Email Schemas
@@ -139,10 +154,8 @@ class EmailResponse(BaseModel):
     subject: str
     received_at: datetime
     created_at: datetime
-    
-    class Config:
-        """Pydantic configuration."""
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class IngestResponse(BaseModel):

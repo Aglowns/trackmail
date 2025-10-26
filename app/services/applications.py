@@ -15,10 +15,11 @@ Why a service layer?
 
 from typing import Optional, List, Dict, Any
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from supabase import Client
 from app.schemas import ApplicationCreate, ApplicationUpdate
+from app.db import get_supabase_client
 
 
 class ApplicationService:
@@ -255,62 +256,160 @@ async def get_user_applications(
     status: Optional[str] = None,
     company: Optional[str] = None,
     position: Optional[str] = None,
+    source: Optional[str] = None,
+    confidence: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
 ) -> tuple[list[dict], int]:
     """
     Get applications for a user with filtering and pagination.
-    
-    RLS automatically filters to only this user's applications.
-    
-    Args:
-        user_id: UUID of the authenticated user
-        skip: Number of records to skip (for pagination)
-        limit: Maximum number of records to return
-        status: Optional status filter
-        company: Optional company name filter (case-insensitive partial match)
-        position: Optional position filter (case-insensitive partial match)
-        
-    Returns:
-        Tuple of (applications list, total count)
-        
-    Example:
-        apps, total = await get_user_applications(
-            user_id="123",
-            skip=0,
-            limit=10,
-            status="applied"
-        )
     """
     supabase = get_supabase_client()
-    
-    # Build query
-    # Start with base query - RLS handles user_id filtering
-    query = supabase.table("applications").select("*", count="exact")
-    
-    # Apply filters
+
+    query = (
+        supabase.table("applications")
+        .select("*", count="exact")
+        .eq("user_id", user_id)
+    )
+
     if status:
         query = query.eq("status", status)
-    
     if company:
-        # Case-insensitive partial match
         query = query.ilike("company", f"%{company}%")
-    
     if position:
-        # Case-insensitive partial match
         query = query.ilike("position", f"%{position}%")
-    
-    # Apply pagination
-    query = query.range(skip, skip + limit - 1)
-    
-    # Order by most recently updated first
-    query = query.order("updated_at", desc=True)
-    
-    # Execute query
+    if source:
+        query = query.eq("source", source)
+    if confidence:
+        query = query.eq("confidence", confidence)
+    if search:
+        query = query.or_(f"company.ilike.%{search}%,position.ilike.%{search}%")
+    if date_from:
+        query = query.gte("applied_at", date_from)
+    if date_to:
+        query = query.lte("applied_at", date_to)
+
+    query = query.range(skip, skip + limit - 1).order("order_index", desc=False).order(
+        "updated_at", desc=True
+    )
+
     result = query.execute()
-    
-    # Extract total count from response
     total = result.count if result.count is not None else 0
-    
-    return result.data, total
+
+    return result.data or [], total
+
+
+async def get_applications_grouped_by_status(user_id: str) -> dict[str, list[dict]]:
+    """Return applications grouped by status ordered by order_index."""
+    supabase = get_supabase_client()
+    result = (
+        supabase.table("applications")
+        .select("*")
+        .eq("user_id", user_id)
+        .order("order_index", desc=False)
+        .order("updated_at", desc=False)
+        .execute()
+    )
+
+    grouped: dict[str, list[dict]] = {}
+    for record in result.data or []:
+        status = record.get("status", "applied")
+        grouped.setdefault(status, []).append(record)
+    return grouped
+
+
+async def export_applications_to_csv(
+    user_id: str,
+    status: Optional[str] = None,
+    company: Optional[str] = None,
+    position: Optional[str] = None,
+    source: Optional[str] = None,
+    confidence: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    search: Optional[str] = None,
+) -> str:
+    """Export filtered applications as CSV."""
+    applications, _ = await get_user_applications(
+        user_id=user_id,
+        skip=0,
+        limit=1000,
+        status=status,
+        company=company,
+        position=position,
+        source=source,
+        confidence=confidence,
+        date_from=date_from,
+        date_to=date_to,
+        search=search,
+    )
+
+    to_iso = lambda value: value.split("T")[0] if isinstance(value, str) and "T" in value else value
+
+    lines = [
+        "Company,Position,Status,Location,Source,Confidence,Applied At,Updated At"
+    ]
+    for app in applications:
+        line = [
+            app.get("company", ""),
+            app.get("position", ""),
+            app.get("status", ""),
+            app.get("location", ""),
+            app.get("source", ""),
+            app.get("confidence", ""),
+            to_iso(app.get("applied_at", "")),
+            to_iso(app.get("updated_at", "")),
+        ]
+        escaped = []
+        for item in line:
+            text = "" if item is None else str(item)
+            if "," in text or "\"" in text:
+                text = text.replace("\"", "\"\"")
+                escaped.append(f'"{text}"')
+            else:
+                escaped.append(text)
+        lines.append(",".join(escaped))
+
+    return "\n".join(lines)
+
+
+async def bulk_update_applications(
+    user_id: str,
+    updates: list[dict],
+) -> list[dict]:
+    """Bulk update application order/status values."""
+    if not updates:
+        return []
+
+    supabase = get_supabase_client()
+    payload = []
+    for update in updates:
+        record_id = update.get("id")
+        if not record_id:
+            continue
+        data: dict[str, Any] = {}
+        if "status" in update:
+            data["status"] = update["status"]
+        if "order_index" in update:
+            data["order_index"] = update["order_index"]
+        if not data:
+            continue
+        data["updated_at"] = datetime.utcnow().isoformat()
+        payload.append({"id": record_id, **data})
+
+    if not payload:
+        return []
+
+    result = (
+        supabase.table("applications")
+        .upsert(payload, on_conflict="id")
+        .select("*")
+        .eq("user_id", user_id)
+        .execute()
+    )
+
+    return result.data or []
 
 
 async def get_application_by_id(application_id: str, user_id: str) -> Optional[dict]:
@@ -420,4 +519,153 @@ async def delete_application(application_id: str, user_id: str) -> bool:
     
     # If data is returned, deletion was successful
     return bool(result.data)
+
+
+async def get_analytics_overview(user_id: str) -> dict:
+    """Get analytics overview data for dashboard."""
+    supabase = get_supabase_client()
+    
+    # Get total applications count
+    total_result = (
+        supabase.table("applications")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    total_applications = total_result.count or 0
+    
+    # Get applications by status
+    status_result = (
+        supabase.table("applications")
+        .select("status")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    
+    status_counts = {}
+    for app in status_result.data or []:
+        status = app.get("status", "applied")
+        status_counts[status] = status_counts.get(status, 0) + 1
+    
+    # Get applications this month
+    month_start = (datetime.now() - timedelta(days=30)).isoformat()
+    month_result = (
+        supabase.table("applications")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .gte("created_at", month_start)
+        .execute()
+    )
+    applications_this_month = month_result.count or 0
+    
+    # Get response rate (applications that moved past "applied" status)
+    responded_result = (
+        supabase.table("applications")
+        .select("id", count="exact")
+        .eq("user_id", user_id)
+        .neq("status", "applied")
+        .execute()
+    )
+    responded_count = responded_result.count or 0
+    response_rate = (responded_count / total_applications * 100) if total_applications > 0 else 0
+    
+    return {
+        "total_applications": total_applications,
+        "applications_this_month": applications_this_month,
+        "response_rate": round(response_rate, 1),
+        "status_counts": status_counts,
+    }
+
+
+async def get_analytics_trends(user_id: str, days: int = 30) -> dict:
+    """Get application trends over time."""
+    supabase = get_supabase_client()
+    
+    start_date = (datetime.now() - timedelta(days=days)).isoformat()
+    
+    # Get applications grouped by date
+    result = (
+        supabase.table("applications")
+        .select("created_at")
+        .eq("user_id", user_id)
+        .gte("created_at", start_date)
+        .order("created_at")
+        .execute()
+    )
+    
+    # Group by date
+    daily_counts = {}
+    for app in result.data or []:
+        date_str = app["created_at"][:10]  # Get YYYY-MM-DD part
+        daily_counts[date_str] = daily_counts.get(date_str, 0) + 1
+    
+    # Create trend data
+    trend_data = []
+    current_date = datetime.now() - timedelta(days=days)
+    for i in range(days):
+        date_str = current_date.strftime("%Y-%m-%d")
+        trend_data.append({
+            "date": date_str,
+            "applications": daily_counts.get(date_str, 0)
+        })
+        current_date += timedelta(days=1)
+    
+    return {
+        "trend_data": trend_data,
+        "total_in_period": sum(daily_counts.values()),
+    }
+
+
+async def get_analytics_companies(user_id: str) -> dict:
+    """Get company analytics data."""
+    supabase = get_supabase_client()
+    
+    # Get applications grouped by company
+    result = (
+        supabase.table("applications")
+        .select("company")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    
+    company_counts = {}
+    for app in result.data or []:
+        company = app.get("company", "Unknown")
+        company_counts[company] = company_counts.get(company, 0) + 1
+    
+    # Sort by count and get top companies
+    sorted_companies = sorted(company_counts.items(), key=lambda x: x[1], reverse=True)
+    top_companies = sorted_companies[:10]  # Top 10 companies
+    
+    return {
+        "company_counts": dict(sorted_companies),
+        "top_companies": [{"company": company, "count": count} for company, count in top_companies],
+        "unique_companies": len(company_counts),
+    }
+
+
+async def get_analytics_sources(user_id: str) -> dict:
+    """Get application source analytics."""
+    supabase = get_supabase_client()
+    
+    # Get applications grouped by source
+    result = (
+        supabase.table("applications")
+        .select("source")
+        .eq("user_id", user_id)
+        .execute()
+    )
+    
+    source_counts = {}
+    for app in result.data or []:
+        source = app.get("source") or "Unknown"
+        source_counts[source] = source_counts.get(source, 0) + 1
+    
+    # Sort by count
+    sorted_sources = sorted(source_counts.items(), key=lambda x: x[1], reverse=True)
+    
+    return {
+        "source_counts": dict(sorted_sources),
+        "top_sources": [{"source": source, "count": count} for source, count in sorted_sources[:5]],
+    }
 

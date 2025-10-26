@@ -157,7 +157,9 @@ function trackApplicationAction(e) {
       emailData.parsed_position = parsedData.position;
       emailData.parsed_email_type = parsedData.emailType;
       emailData.parsed_confidence = parsedData.confidence;
-      emailData.parsed_job_url = parsedData.jobUrl;
+      emailData.parsed_job_url = normalizeJobUrl(
+        parsedData.jobUrl || parsedData.job_url || parsedData.jobURL
+      );
       
       // Add status detection data
       emailData.detected_status = statusDetection.status;
@@ -804,7 +806,9 @@ function debugTrackApplication() {
       emailData.parsed_position = parsedData.position;
       emailData.parsed_email_type = parsedData.emailType;
       emailData.parsed_confidence = parsedData.confidence;
-      emailData.parsed_job_url = parsedData.jobUrl;
+      emailData.parsed_job_url = normalizeJobUrl(
+        parsedData.jobUrl || parsedData.job_url || parsedData.jobURL
+      );
       
       // Add status detection data
       emailData.detected_status = statusDetection.status;
