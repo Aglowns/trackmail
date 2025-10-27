@@ -26,6 +26,7 @@ async def lifespan(app: FastAPI):  # noqa: D401
     print(f"🚀 TrackMail API starting in {settings.environment} mode")
     print("📝 Docs available at /docs")
     print("🔧 Backend redeployed - checking connectivity...")
+    print("🚀 Route fix applied - status-groups should work now")
     try:
         yield
     finally:
