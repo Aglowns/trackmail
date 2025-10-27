@@ -33,7 +33,7 @@ async def health_check() -> dict[str, str]:
             "status": "ok"
         }
     """
-    return {"status": "ok"}
+    return {"status": "ok", "version": "route-fix-v3", "timestamp": "2025-10-27T01:30:00Z"}
 
 
 @router.get("/health/detailed")
