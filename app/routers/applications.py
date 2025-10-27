@@ -116,6 +116,36 @@ async def create_application(
     return ApplicationResponse(**application)
 
 
+@router.get("/status-groups")
+async def applications_by_status(user_id: CurrentUserId) -> dict[str, list[dict]]:
+    """Return applications grouped by status for kanban views."""
+    return await app_service.get_applications_grouped_by_status(user_id)
+
+
+@router.get("/export")
+async def export_applications(
+    user_id: CurrentUserId,
+    filters: FilterParams = Depends(),
+) -> StreamingResponse:
+    """Export applications as CSV respecting current filters."""
+    csv_data = await app_service.export_applications_to_csv(
+        user_id=user_id,
+        status=filters.status,
+        company=filters.company,
+        position=filters.position,
+        source=filters.source,
+        confidence=filters.confidence,
+        date_from=filters.date_from,
+        date_to=filters.date_to,
+        search=filters.search,
+    )
+    return StreamingResponse(
+        iter([csv_data]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=applications.csv"}
+    )
+
+
 @router.get("/{application_id}", response_model=ApplicationResponse)
 async def get_application(
     application_id: str,
@@ -225,38 +255,6 @@ async def delete_application(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Application not found"
         )
-
-
-@router.get("/status-groups")
-async def applications_by_status(user_id: CurrentUserId) -> dict[str, list[dict]]:
-    """Return applications grouped by status for kanban views."""
-    return await app_service.get_applications_grouped_by_status(user_id)
-
-
-@router.get("/export")
-async def export_applications(
-    user_id: CurrentUserId,
-    filters: FilterParams = Depends(),
-) -> StreamingResponse:
-    """Export applications as CSV respecting current filters."""
-    csv_data = await app_service.export_applications_to_csv(
-        user_id=user_id,
-        status=filters.status,
-        company=filters.company,
-        position=filters.position,
-        source=filters.source,
-        confidence=filters.confidence,
-        date_from=filters.date_from,
-        date_to=filters.date_to,
-        search=filters.search,
-    )
-    return StreamingResponse(
-        iter([csv_data]),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": "attachment; filename=applications.csv",
-        },
-    )
 
 
 @router.put("/bulk-update", response_model=list[ApplicationResponse])
