@@ -146,6 +146,35 @@ async def export_applications(
     )
 
 
+
+
+@router.get("/analytics/overview")
+async def get_analytics_overview(user_id: CurrentUserId) -> dict:
+    """Get analytics overview data for dashboard."""
+    return await app_service.get_analytics_overview(user_id)
+
+
+@router.get("/analytics/trends")
+async def get_analytics_trends(
+    user_id: CurrentUserId,
+    days: int = 30
+) -> dict:
+    """Get application trends over time."""
+    return await app_service.get_analytics_trends(user_id, days)
+
+
+@router.get("/analytics/companies")
+async def get_analytics_companies(user_id: CurrentUserId) -> dict:
+    """Get company analytics data."""
+    return await app_service.get_analytics_companies(user_id)
+
+
+@router.get("/analytics/sources")
+async def get_analytics_sources(user_id: CurrentUserId) -> dict:
+    """Get application source analytics."""
+    return await app_service.get_analytics_sources(user_id)
+
+
 @router.get("/{application_id}", response_model=ApplicationResponse)
 async def get_application(
     application_id: str,
@@ -267,29 +296,4 @@ async def bulk_update_applications(
     return [ApplicationResponse(**record) for record in result]
 
 
-@router.get("/analytics/overview")
-async def get_analytics_overview(user_id: CurrentUserId) -> dict:
-    """Get analytics overview data for dashboard."""
-    return await app_service.get_analytics_overview(user_id)
-
-
-@router.get("/analytics/trends")
-async def get_analytics_trends(
-    user_id: CurrentUserId,
-    days: int = 30
-) -> dict:
-    """Get application trends over time."""
-    return await app_service.get_analytics_trends(user_id, days)
-
-
-@router.get("/analytics/companies")
-async def get_analytics_companies(user_id: CurrentUserId) -> dict:
-    """Get company analytics data."""
-    return await app_service.get_analytics_companies(user_id)
-
-
-@router.get("/analytics/sources")
-async def get_analytics_sources(user_id: CurrentUserId) -> dict:
-    """Get application source analytics."""
-    return await app_service.get_analytics_sources(user_id)
 
