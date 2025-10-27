@@ -27,6 +27,7 @@ async def lifespan(app: FastAPI):  # noqa: D401
     print("📝 Docs available at /docs")
     print("🔧 Backend redeployed - checking connectivity...")
     print("🚀 Route fix applied - status-groups should work now")
+    print("🔄 FORCE REDEPLOY - Using app.main:app entry point")
     try:
         yield
     finally:
