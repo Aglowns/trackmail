@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):  # noqa: D401
     """Manage application startup and shutdown."""
     print(f"🚀 TrackMail API starting in {settings.environment} mode")
     print("📝 Docs available at /docs")
+    print("🔧 Backend redeployed - checking connectivity...")
     try:
         yield
     finally:
