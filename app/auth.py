@@ -30,6 +30,14 @@ from jose import JWTError, jwt
 
 from app.config import settings
 
+JWT_SECRET = settings.supabase_jwt_secret or settings.supabase_anon_key
+if settings.supabase_jwt_secret is None:
+    import logging
+
+    logging.getLogger(__name__).warning(
+        "SUPABASE_JWT_SECRET not set; falling back to anon key. Set SUPABASE_JWT_SECRET for stricter auth validation."
+    )
+
 # HTTP Bearer token scheme
 # This automatically extracts the token from the Authorization header
 # Format: Authorization: Bearer <token>
@@ -72,10 +80,7 @@ def verify_jwt_token(token: str) -> dict:
         
         payload = jwt.decode(
             token,
-            # Note: In production, extract the actual JWT secret from Supabase
-            # For now, we'll verify the token structure without strict verification
-            # This allows the token to pass through - in production, add proper verification
-            settings.supabase_anon_key,
+            JWT_SECRET,
             algorithms=["HS256"],
             audience=settings.jwt_audience,
             issuer=settings.jwt_issuer,

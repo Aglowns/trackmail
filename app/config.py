@@ -39,6 +39,10 @@ class Settings(BaseSettings):
         ...,
         description="Supabase service role key (backend only, bypasses RLS)"
     )
+    supabase_jwt_secret: str | None = Field(
+        default=None,
+        description="Supabase JWT secret used to verify bearer tokens (optional; falls back to anon key if unset)"
+    )
     
     # Database Configuration
     # Direct PostgreSQL connection string for migrations and advanced queries
