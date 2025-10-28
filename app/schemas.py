@@ -85,6 +85,11 @@ class ProfileUpdate(ProfileBase):
     pass
 
 
+class ProfileCreate(ProfileBase):
+    """Schema for creating a new profile with signup data."""
+    goals: Optional[str] = None
+
+
 class ApplicationResponse(ApplicationBase):
     """Schema for application responses."""
     id: UUID
