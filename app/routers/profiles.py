@@ -13,7 +13,8 @@ router = APIRouter(prefix="/profiles", tags=["Profiles"])
 async def get_my_profile(user_id: CurrentUserId) -> ProfileResponse:
     profile = await profile_service.get_profile(user_id)
     if not profile:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Profile not found")
+        # Create a default profile for new users
+        profile = await profile_service.create_default_profile(user_id)
     return ProfileResponse(**profile)
 
 

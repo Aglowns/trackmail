@@ -36,3 +36,36 @@ async def update_profile(user_id: str, data: dict) -> Optional[dict]:
         return None
 
     return result.data
+
+
+async def create_default_profile(user_id: str) -> dict:
+    """Create a default profile for new users"""
+    supabase = get_supabase_client()
+    
+    # Get user email from auth.users table
+    auth_user = supabase.auth.get_user()
+    user_email = auth_user.user.email if auth_user.user else "user@example.com"
+    
+    profile_data = {
+        "id": user_id,
+        "email": user_email,
+        "full_name": "",
+        "profession": "",
+        "phone": "",
+        "notification_email": user_email,
+        "job_preferences": {
+            "preferred_roles": "",
+            "preferred_locations": "",
+            "salary_range": ""
+        },
+        "goals": "",
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat()
+    }
+    
+    result = supabase.table("profiles").insert(profile_data).execute()
+    
+    if not result.data:
+        raise Exception("Failed to create default profile")
+    
+    return result.data[0]
