@@ -82,12 +82,15 @@ async def detailed_health_check() -> dict[str, str | dict[str, str]]:
 @router.get("/debug/auth")
 async def debug_auth_config() -> dict[str, str]:
     """Debug endpoint to check auth configuration without requiring authentication."""
-    from app.config import settings
-    return {
-        "supabase_url": settings.supabase_url,
-        "jwt_audience": settings.jwt_audience,
-        "jwt_issuer": settings.jwt_issuer,
-        "has_jwt_secret": bool(settings.supabase_jwt_secret),
-        "environment": settings.environment,
-    }
+    try:
+        from app.config import settings
+        return {
+            "supabase_url": str(settings.supabase_url),
+            "jwt_audience": str(settings.jwt_audience),
+            "jwt_issuer": str(settings.jwt_issuer),
+            "has_jwt_secret": bool(settings.supabase_jwt_secret),
+            "environment": str(settings.environment),
+        }
+    except Exception as e:
+        return {"error": str(e)}
 
