@@ -46,13 +46,8 @@ async def update_profile(user_id: str, data: dict) -> Optional[dict]:
         )
         return None
 
-    if not response.data:
-        # Some Supabase responses omit data; fetch latest record instead
-        return await get_profile(user_id)
-
-    # Supabase returns list of rows
-    updated_profile = response.data[0] if isinstance(response.data, list) else response.data
-    return updated_profile
+    # Always fetch the latest profile after updating to ensure we return a complete record
+    return await get_profile(user_id)
 
 
 async def create_default_profile(user_id: str) -> dict:
