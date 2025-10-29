@@ -34,9 +34,6 @@ async def update_profile(user_id: str, data: dict) -> Optional[dict]:
             supabase.table("profiles")
             .update(payload)
             .eq("id", user_id)
-            .select(
-                "id, email, full_name, profession, phone, notification_email, job_preferences, created_at, updated_at"
-            )
             .execute()
         )
     except Exception as exc:  # pragma: no cover - debug logging for production issues
@@ -50,7 +47,8 @@ async def update_profile(user_id: str, data: dict) -> Optional[dict]:
         return None
 
     if not response.data:
-        return None
+        # Some Supabase responses omit data; fetch latest record instead
+        return await get_profile(user_id)
 
     # Supabase returns list of rows
     updated_profile = response.data[0] if isinstance(response.data, list) else response.data
