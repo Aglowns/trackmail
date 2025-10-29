@@ -10,12 +10,18 @@ async def get_profile(user_id: str) -> Optional[dict]:
     supabase = get_supabase_client()
     result = (
         supabase.table("profiles")
-        .select("id, email, full_name, profession, phone, notification_email, job_preferences, created_at, updated_at")
+        .select(
+            "id, email, full_name, profession, phone, notification_email, job_preferences, created_at, updated_at"
+        )
         .eq("id", user_id)
-        .single()
         .execute()
     )
-    return result.data
+
+    if not result.data:
+        return None
+
+    # .single() raises when row not found; instead return the first result if available
+    return result.data[0]
 
 
 async def update_profile(user_id: str, data: dict) -> Optional[dict]:
