@@ -29,19 +29,32 @@ async def update_profile(user_id: str, data: dict) -> Optional[dict]:
     payload = {key: value for key, value in data.items() if value is not None}
     payload["updated_at"] = datetime.utcnow().isoformat()
 
-    result = (
-        supabase.table("profiles")
-        .update(payload)
-        .eq("id", user_id)
-        .select("id, email, full_name, profession, phone, notification_email, job_preferences, created_at, updated_at")
-        .single()
-        .execute()
-    )
+    try:
+        response = (
+            supabase.table("profiles")
+            .update(payload)
+            .eq("id", user_id)
+            .select(
+                "id, email, full_name, profession, phone, notification_email, job_preferences, created_at, updated_at"
+            )
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover - debug logging for production issues
+        print(f"Failed to update profile for user {user_id}: {exc}")
+        raise
 
-    if not result.data:
+    if getattr(response, "error", None):
+        print(
+            f"Supabase update error for user {user_id}: {response.error}"  # pragma: no cover - debug
+        )
         return None
 
-    return result.data
+    if not response.data:
+        return None
+
+    # Supabase returns list of rows
+    updated_profile = response.data[0] if isinstance(response.data, list) else response.data
+    return updated_profile
 
 
 async def create_default_profile(user_id: str) -> dict:
