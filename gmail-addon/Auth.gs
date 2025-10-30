@@ -401,14 +401,53 @@ function makeAuthenticatedRequest(endpoint, options) {
     try {
       responseData = JSON.parse(responseText);
     } catch (e) {
-      responseData = { error: 'Invalid JSON response', raw: responseText };
+      // Backend returned non-JSON (likely HTML error page or plain text)
+      console.error('Failed to parse JSON response:', responseText);
+      
+      // Try to extract useful error information
+      let errorMessage = 'Server error';
+      if (responseText.includes('500') || responseText.includes('Internal Server Error')) {
+        errorMessage = 'Internal server error. Please try again later.';
+      } else if (responseText.includes('502') || responseText.includes('Bad Gateway')) {
+        errorMessage = 'Backend service unavailable. Please try again in a few moments.';
+      } else if (responseText.includes('503') || responseText.includes('Service Unavailable')) {
+        errorMessage = 'Service temporarily unavailable. Please try again later.';
+      } else if (responseText.length > 0) {
+        // Try to extract first line or meaningful text
+        const lines = responseText.split('\n').filter(line => line.trim().length > 0);
+        if (lines.length > 0 && lines[0].length < 200) {
+          errorMessage = lines[0].substring(0, 100);
+        }
+      }
+      
+      responseData = { 
+        error: errorMessage,
+        message: errorMessage,
+        raw: responseText.substring(0, 500) // Limit raw text length
+      };
     }
     
     if (statusCode >= 200 && statusCode < 300) {
       return responseData;
     } else {
       console.error('API request failed:', statusCode, responseData);
-      throw new Error(`API request failed with status ${statusCode}: ${responseData.error || responseData.message || 'Unknown error'}`);
+      
+      // Provide user-friendly error messages
+      let errorMessage = responseData.error || responseData.message || 'Unknown error';
+      
+      if (statusCode === 500) {
+        errorMessage = 'Server error occurred. Please try again in a few moments.';
+      } else if (statusCode === 502) {
+        errorMessage = 'Backend service unavailable. Please try again later.';
+      } else if (statusCode === 503) {
+        errorMessage = 'Service temporarily unavailable. Please try again later.';
+      } else if (statusCode === 401) {
+        errorMessage = 'Authentication expired. Please sign in again.';
+      } else if (statusCode === 429) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      }
+      
+      throw new Error(`API request failed with status ${statusCode}: ${errorMessage}`);
     }
     
   } catch (error) {

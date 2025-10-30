@@ -82,9 +82,10 @@ async def ingest_email(
             "duplicate": true
         }
     """
-    # Step 1: Check for duplicate email
-    email_hash = generate_email_hash(email_data)
-    existing_email = await check_duplicate_email(email_hash)
+    try:
+        # Step 1: Check for duplicate email
+        email_hash = generate_email_hash(email_data)
+        existing_email = await check_duplicate_email(email_hash)
     
     if existing_email and existing_email.get("application_id"):
         # Duplicate found with linked application - check if status needs updating

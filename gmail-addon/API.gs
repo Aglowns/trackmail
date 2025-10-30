@@ -60,6 +60,15 @@ function ingestEmail(emailData) {
       };
     }
     
+    // Check if it's a 500 server error
+    if (error.message.includes('500') || error.message.includes('Server error')) {
+      return {
+        success: false,
+        message: 'Server error occurred. Please try again in a few moments. If this persists, contact support.',
+        error_type: 'server_error'
+      };
+    }
+    
     return {
       success: false,
       message: error.message || 'Failed to ingest email',
