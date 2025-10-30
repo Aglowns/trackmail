@@ -315,7 +315,66 @@ function fetchNewAccessToken() {
  */
 function getUserEmail() {
   const userProperties = PropertiesService.getUserProperties();
-  return userProperties.getProperty(USER_EMAIL_KEY);
+  const storedEmail = userProperties.getProperty(USER_EMAIL_KEY);
+
+  if (storedEmail) {
+    return storedEmail;
+  }
+
+  const candidateTokens = [
+    userProperties.getProperty(CACHED_TOKEN_KEY),
+    userProperties.getProperty(SESSION_HANDLE_KEY),
+    userProperties.getProperty(INSTALLATION_TOKEN_KEY),
+  ];
+
+  for (const token of candidateTokens) {
+    if (!token || !token.startsWith('eyJ')) {
+      continue;
+    }
+
+    const payload = decodeJwtPayload(token);
+    if (!payload) {
+      continue;
+    }
+
+    const derivedEmail = payload.email
+      || payload.user_email
+      || (payload.user_metadata && payload.user_metadata.email)
+      || (payload.sub && payload.sub.indexOf('@') > -1 ? payload.sub : null);
+
+    if (derivedEmail) {
+      userProperties.setProperty(USER_EMAIL_KEY, derivedEmail);
+      return derivedEmail;
+    }
+  }
+
+  try {
+    const activeUserEmail = Session.getActiveUser().getEmail();
+    if (activeUserEmail) {
+      userProperties.setProperty(USER_EMAIL_KEY, activeUserEmail);
+      return activeUserEmail;
+    }
+  } catch (error) {
+    console.log('Unable to read active user email (expected in limited scopes):', error);
+  }
+
+  return null;
+}
+
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split('.');
+    if (parts.length !== 3) {
+      return null;
+    }
+
+    const payloadBytes = Utilities.base64DecodeWebSafe(parts[1]);
+    const payloadJson = Utilities.newBlob(payloadBytes).getDataAsString();
+    return JSON.parse(payloadJson);
+  } catch (error) {
+    console.error('Failed to decode JWT payload:', error);
+    return null;
+  }
 }
 
 /**
@@ -437,23 +496,15 @@ function makeAuthenticatedRequest(endpoint, options) {
       return responseData;
     } else {
       console.error('API request failed:', statusCode, responseData);
-      
-      // Provide user-friendly error messages
-      let errorMessage = responseData.error || responseData.message || 'Unknown error';
-      
-      if (statusCode === 500) {
-        errorMessage = 'Server error occurred. Please try again in a few moments.';
-      } else if (statusCode === 502) {
-        errorMessage = 'Backend service unavailable. Please try again later.';
-      } else if (statusCode === 503) {
-        errorMessage = 'Service temporarily unavailable. Please try again later.';
-      } else if (statusCode === 401) {
-        errorMessage = 'Authentication expired. Please sign in again.';
-      } else if (statusCode === 429) {
-        errorMessage = 'Too many requests. Please wait a moment and try again.';
-      }
-      
-      throw new Error(`API request failed with status ${statusCode}: ${errorMessage}`);
+
+      // Build a compact, serializable error payload so callers can display details
+      const payload = {
+        status: statusCode,
+        message: responseData.error || responseData.message || 'Unknown error',
+        raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
+      };
+      // Throw a JSON string so callers can parse it
+      throw new Error('API_ERROR::' + JSON.stringify(payload));
     }
     
   } catch (error) {

@@ -57,7 +57,7 @@ function buildSignInCard() {
  * @return {Card} Tracking card
  */
 function buildTrackingCard(messageId, accessToken) {
-  const userEmail = getUserEmail() || 'Signed In';
+  const userEmail = getUserEmail() || 'Unknown user';
   
   // Fetch basic email data for preview (lightweight)
   let emailPreview = '';
