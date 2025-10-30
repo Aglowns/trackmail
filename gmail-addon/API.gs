@@ -41,6 +41,17 @@ function ingestEmail(emailData) {
     
   } catch (error) {
     console.error('Error ingesting email:', error);
+
+    // Try to extract structured API error if provided by makeAuthenticatedRequest
+    let apiError = null;
+    try {
+      const msg = String(error && error.message ? error.message : '');
+      if (msg.startsWith('API_ERROR::')) {
+        apiError = JSON.parse(msg.substring('API_ERROR::'.length));
+      }
+    } catch (e) {
+      // ignore parse errors
+    }
     
     // Check if it's a timeout or connection error
     if (error.message.includes('timeout') || error.message.includes('connection') || error.message.includes('unavailable')) {
@@ -61,18 +72,22 @@ function ingestEmail(emailData) {
     }
     
     // Check if it's a 500 server error
-    if (error.message.includes('500') || error.message.includes('Server error')) {
+    if ((apiError && apiError.status === 500) || error.message.includes('500') || error.message.includes('Server error')) {
       return {
         success: false,
-        message: 'Server error occurred. Please try again in a few moments. If this persists, contact support.',
-        error_type: 'server_error'
+        message: apiError && apiError.message ? apiError.message : 'Server error occurred. Please try again in a few moments.',
+        error_type: 'server_error',
+        detail: apiError ? (apiError.detail || apiError.message) : error.message,
+        raw_response: apiError ? apiError.raw : undefined
       };
     }
     
     return {
       success: false,
-      message: error.message || 'Failed to ingest email',
-      error_type: 'general_error'
+      message: apiError ? apiError.message : (error.message || 'Failed to ingest email'),
+      error_type: 'general_error',
+      detail: apiError ? (apiError.detail || apiError.raw) : error.message,
+      raw_response: apiError ? apiError.raw : undefined
     };
   }
 }

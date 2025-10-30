@@ -82,9 +82,10 @@ async def ingest_email(
             "duplicate": true
         }
     """
-    # Step 1: Check for duplicate email
-    email_hash = generate_email_hash(email_data)
-    existing_email = await check_duplicate_email(email_hash)
+    try:
+        # Step 1: Check for duplicate email
+        email_hash = generate_email_hash(email_data)
+        existing_email = await check_duplicate_email(email_hash)
     
     if existing_email and existing_email.get("application_id"):
         # Duplicate found with linked application - check if status needs updating
@@ -266,13 +267,24 @@ async def ingest_email(
         duplicate=False,
     )
     
-    # Add status detection to response if available
-    if status_detection:
-        response_dict = response.dict()
-        response_dict['status_detection'] = status_detection
-        return response_dict
-    
-    return response
+        # Add status detection to response if available
+        if status_detection:
+            response_dict = response.dict()
+            response_dict['status_detection'] = status_detection
+            return response_dict
+        
+        return response
+    except Exception as e:
+        # Catch any unhandled exceptions and return proper JSON error
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"❌ Unhandled error in ingest_email: {e}")
+        print(f"Traceback: {error_trace}")
+        
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Internal server error: {str(e)}"
+        )
 
 
 @router.post("/email/test", response_model=dict)

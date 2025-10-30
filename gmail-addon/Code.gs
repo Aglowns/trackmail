@@ -231,13 +231,67 @@ function trackApplicationAction(e) {
         )
         .build();
     } else {
-      // Show error card
+      // Show error card with diagnostic details from backend
       console.log('Showing error card, result:', result);
-      const errorMessage = result ? (result.message || 'Failed to track application') : 'No response from server';
+      console.log('Full result object:', JSON.stringify(result, null, 2));
+      
+      const errorMessage = result ? (result.message || result.error || 'Failed to track application') : 'No response from server';
+      const detailsLines = [];
+      
+      // Extract all useful diagnostic information
+      if (result && result.error_type) {
+        detailsLines.push('Type: ' + result.error_type);
+      }
+      if (result && result.detail) {
+        detailsLines.push('Detail: ' + JSON.stringify(result.detail));
+      }
+      if (result && result.status) {
+        detailsLines.push('Status: ' + result.status);
+      }
+      if (result && result.raw_response) {
+        const raw = String(result.raw_response);
+        detailsLines.push('Response: ' + raw.substring(0, 200) + (raw.length > 200 ? '…' : ''));
+      }
+      
+      const detailsText = detailsLines.length > 0 ? ('<br><br><font color="#6b7280">' + detailsLines.join('<br>') + '</font>') : '';
+
       return CardService.newActionResponseBuilder()
         .setNavigation(
           CardService.newNavigation().updateCard(
-            buildErrorCard(errorMessage)
+            CardService.newCardBuilder()
+              .setHeader(
+                CardService.newCardHeader()
+                  .setTitle('📧 TrackMail')
+                  .setSubtitle('Error Details')
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextParagraph()
+                      .setText('<b>Server error occurred.</b><br>' + errorMessage + detailsText)
+                  )
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextButton()
+                      .setText('🔁 Try Again')
+                      .setBackgroundColor('#6366f1')
+                      .setOnClickAction(
+                        CardService.newAction()
+                          .setFunctionName('onGmailMessageOpen')
+                      )
+                  )
+                  .addWidget(
+                    CardService.newTextButton()
+                      .setText('← Back')
+                      .setOnClickAction(
+                        CardService.newAction()
+                          .setFunctionName('onGmailMessageOpen')
+                      )
+                  )
+              )
+              .build()
           )
         )
         .build();
