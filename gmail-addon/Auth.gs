@@ -140,22 +140,25 @@ function getAccessToken() {
       
       // Try to refresh the token automatically
       const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
-      if (refreshToken) {
+      if (refreshToken && refreshToken.length > 20) { // Only try if we have a real refresh token
+        console.log('Attempting to refresh using stored refresh token...');
         const newToken = refreshAccessToken(refreshToken);
         if (newToken) {
           console.log('Token refreshed successfully');
           return newToken;
         }
+      } else {
+        console.log('No valid refresh token available - user will need to re-authenticate');
       }
       
-      // Refresh failed - clear expired tokens
+      // Refresh failed or not available - clear expired tokens
       userProperties.deleteProperty(CACHED_TOKEN_KEY);
       userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
     }
   }
   
   // No valid token - user needs to sign in
-  console.log('No valid access token found');
+  console.log('No valid access token found - authentication required');
   return null;
 }
 
@@ -188,22 +191,27 @@ function refreshAccessToken(refreshToken) {
       muteHttpExceptions: true
     };
     
+    console.log('Calling Supabase refresh API...');
     const response = UrlFetchApp.fetch(url, options);
     const statusCode = response.getResponseCode();
+    const responseText = response.getContentText();
+    
+    console.log('Refresh response status:', statusCode);
+    console.log('Refresh response body:', responseText);
     
     if (statusCode !== 200) {
-      console.error('Token refresh failed:', statusCode, response.getContentText());
+      console.error('Token refresh failed:', statusCode, responseText);
       return null;
     }
     
-    const data = JSON.parse(response.getContentText());
+    const data = JSON.parse(responseText);
     
     if (!data.access_token) {
       console.error('No access token in refresh response');
       return null;
     }
     
-    // Save the new tokens
+    // Save the new tokens and user email
     const userProperties = PropertiesService.getUserProperties();
     userProperties.setProperty(CACHED_TOKEN_KEY, data.access_token);
     
@@ -212,16 +220,22 @@ function refreshAccessToken(refreshToken) {
       userProperties.setProperty(REFRESH_TOKEN_KEY, data.refresh_token);
     }
     
+    // Save user email from the token response
+    if (data.user && data.user.email) {
+      userProperties.setProperty(USER_EMAIL_KEY, data.user.email);
+    }
+    
     // Calculate new expiry time
     const expiresInSeconds = data.expires_in || 3600;
     const expiresAt = new Date().getTime() + (expiresInSeconds * 1000) - 300000;
     userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
     
-    console.log('Token refresh successful');
+    console.log('Token refresh successful for user:', data.user ? data.user.email : 'unknown');
     return data.access_token;
     
   } catch (error) {
     console.error('Error refreshing token:', error);
+    console.error('Error stack:', error.stack);
     return null;
   }
 }

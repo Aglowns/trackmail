@@ -762,7 +762,7 @@ function showTokenInputCard(e) {
 }
 
 /**
- * Save the pasted refresh token and attempt to connect.
+ * Save the pasted access token and attempt to connect.
  * 
  * @param {Object} e - Event object with form inputs
  * @return {ActionResponse} Navigation action
@@ -772,18 +772,61 @@ function saveTokenAndConnect(e) {
   
   try {
     const formInputs = e.formInput || {};
-    const refreshToken = formInputs.refresh_token;
+    const pastedToken = formInputs.refresh_token; // Field name is still 'refresh_token' for backward compat
     
-    if (!refreshToken || refreshToken.trim() === '') {
+    if (!pastedToken || pastedToken.trim() === '') {
       return buildErrorCard('Please paste a valid token');
     }
     
-    // Try to use this refresh token to get an access token
-    console.log('Attempting to refresh token...');
-    const accessToken = refreshAccessToken(refreshToken.trim());
+    const token = pastedToken.trim();
     
-    if (!accessToken) {
-      return buildErrorCard('Invalid token or connection failed. Please make sure you copied the entire token from the Settings page.');
+    // Determine if this is an access token (JWT) or refresh token
+    // JWTs start with "eyJ" (base64 encoded JSON header)
+    const isAccessToken = token.startsWith('eyJ');
+    
+    console.log('Token type detected:', isAccessToken ? 'access token (JWT)' : 'refresh token');
+    console.log('Token length:', token.length);
+    
+    if (isAccessToken) {
+      // User pasted an access token directly - save it and extract email
+      console.log('Validating and saving access token...');
+      
+      // Parse the JWT to extract user email
+      const parts = token.split('.');
+      if (parts.length !== 3) {
+        return buildErrorCard('Invalid token format. Please copy the entire token from Settings.');
+      }
+      
+      try {
+        const payload = JSON.parse(Utilities.newBlob(Utilities.base64Decode(parts[1])).getDataAsString());
+        const userEmail = payload.email || Session.getActiveUser().getEmail();
+        const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
+        
+        // Save the access token (no refresh token available in this flow)
+        const userProperties = PropertiesService.getUserProperties();
+        userProperties.setProperty(CACHED_TOKEN_KEY, token);
+        userProperties.setProperty(USER_EMAIL_KEY, userEmail);
+        
+        // Calculate expiry time
+        const expiresAt = new Date().getTime() + (expiresIn * 1000) - 300000; // 5 min buffer
+        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
+        
+        console.log('Access token saved successfully for user:', userEmail);
+        console.log('Token expires in:', Math.floor(expiresIn / 60), 'minutes');
+        
+      } catch (parseError) {
+        console.error('Failed to parse JWT:', parseError);
+        return buildErrorCard('Invalid token format. Please copy the token from the Settings page.');
+      }
+      
+    } else {
+      // User pasted a refresh token - exchange it for an access token
+      console.log('Attempting to exchange refresh token for access token...');
+      const accessToken = refreshAccessToken(token);
+      
+      if (!accessToken) {
+        return buildErrorCard('Invalid token or connection failed. Please make sure you copied the entire token from the Settings page.');
+      }
     }
     
     // Success! Token is valid and saved
