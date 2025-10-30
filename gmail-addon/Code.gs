@@ -22,17 +22,21 @@ function onGmailMessageOpen(e) {
   console.log('onGmailMessageOpen triggered');
   
   try {
-    // Check if user is authenticated
-    const sessionHandle = getSessionHandle();
+    // Check if user is authenticated by verifying we have a valid access token
+    // This is more reliable than checking sessionHandle alone
+    const accessToken = getAccessToken();
     
-    if (!sessionHandle) {
+    if (!accessToken) {
       // User not authenticated - show sign-in card
+      console.log('No valid access token found - showing sign-in card');
       return buildSignInCard();
     }
     
+    console.log('User authenticated - showing tracking card');
+    
     // User is authenticated - show email tracking card
     const messageId = e.gmail ? e.gmail.messageId : null;
-    const accessToken = e.gmail ? e.gmail.accessToken : null;
+    const gmailAccessToken = e.gmail ? e.gmail.accessToken : null;
     
     if (!messageId) {
       console.log('No messageId available, trying to get from current message');
@@ -44,7 +48,7 @@ function onGmailMessageOpen(e) {
           if (messages.length > 0) {
             const currentMessageId = messages[0].getId();
             console.log('Using current message ID:', currentMessageId);
-            return buildTrackingCard(currentMessageId, accessToken);
+            return buildTrackingCard(currentMessageId, gmailAccessToken);
           }
         }
       } catch (msgError) {
@@ -52,7 +56,7 @@ function onGmailMessageOpen(e) {
       }
     }
     
-    return buildTrackingCard(messageId, accessToken);
+    return buildTrackingCard(messageId, gmailAccessToken);
     
   } catch (error) {
     console.error('Error in onGmailMessageOpen:', error);
@@ -92,15 +96,17 @@ function onGmailSettings(e) {
   console.log('onGmailSettings triggered');
   
   try {
-    // Check if user is authenticated
-    const sessionHandle = getSessionHandle();
+    // Check if user is authenticated by verifying we have a valid access token
+    const accessToken = getAccessToken();
     const userEmail = getUserEmail();
     
-    if (!sessionHandle) {
+    if (!accessToken) {
       // User not authenticated - show sign-in card
+      console.log('No valid access token found - showing sign-in card');
       return buildSignInCard();
     }
     
+    console.log('User authenticated - showing settings card');
     // User is authenticated - show settings card
     return buildSettingsCard(userEmail);
     
@@ -552,9 +558,19 @@ function fetchEmailData(messageId, accessToken) {
  * @return {Card} The card to display
  */
 function openTokenPageAction(e) {
-  console.log('openTokenPageAction triggered - opening sign-in instructions');
+  console.log('openTokenPageAction triggered - checking authentication status');
 
   try {
+    // Check if user is already authenticated
+    const accessToken = getAccessToken();
+    
+    if (accessToken) {
+      // User is already authenticated - show success card with "Start Tracking" button
+      console.log('User already authenticated - showing success card');
+      return buildAuthSuccessCard();
+    }
+    
+    console.log('User not authenticated - showing token input instructions');
     const loginUrl = getFrontendLoginUrl();
     
     return CardService.newCardBuilder()
@@ -633,6 +649,15 @@ function checkAuthenticationAction(e) {
   console.log('checkAuthenticationAction triggered');
   
   try {
+    // Check if user is already authenticated
+    const accessToken = getAccessToken();
+    
+    if (accessToken) {
+      // User is already authenticated - show success card
+      console.log('User already authenticated - showing success card');
+      return buildAuthSuccessCard();
+    }
+    
     // Try to get the user's email from their Gmail session
     const userEmail = Session.getActiveUser().getEmail();
     
@@ -713,6 +738,15 @@ function showTokenInputCard(e) {
   console.log('showTokenInputCard triggered');
   
   try {
+    // Check if user is already authenticated
+    const accessToken = getAccessToken();
+    
+    if (accessToken) {
+      // User is already authenticated - show success card
+      console.log('User already authenticated - showing success card');
+      return buildAuthSuccessCard();
+    }
+    
     return CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
@@ -806,6 +840,9 @@ function saveTokenAndConnect(e) {
         const userProperties = PropertiesService.getUserProperties();
         userProperties.setProperty(CACHED_TOKEN_KEY, token);
         userProperties.setProperty(USER_EMAIL_KEY, userEmail);
+        
+        // Also save as session handle for backward compatibility
+        userProperties.setProperty(SESSION_HANDLE_KEY, token);
         
         // Calculate expiry time
         const expiresAt = new Date().getTime() + (expiresIn * 1000) - 300000; // 5 min buffer
