@@ -18,11 +18,33 @@ Benefits:
 from typing import Annotated
 
 from fastapi import Depends, Query
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth import get_current_user_id
 
 # Re-export auth dependencies for convenience
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
+
+# HTTP Bearer token scheme for extracting raw token
+_token_security = HTTPBearer()
+
+
+async def get_current_user_token(
+    credentials: Annotated[HTTPAuthorizationCredentials, Depends(_token_security)]
+) -> str:
+    """
+    Extract the raw access token from the Authorization header.
+    
+    This is useful for endpoints that need to return the token,
+    such as for Gmail add-on integration.
+    
+    Args:
+        credentials: Automatically extracted from Authorization header
+        
+    Returns:
+        The raw JWT token string
+    """
+    return credentials.credentials
 
 
 # Common Query Parameters
