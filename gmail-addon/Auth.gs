@@ -13,23 +13,25 @@
  */
 
 // Configuration
-const AUTH_BRIDGE_URL = 'https://trackmail-frontend.vercel.app'; // Your existing frontend URL
+const FRONTEND_LOGIN_URL = 'https://trackmail-frontend.vercel.app/login'; // Frontend login page
 const BACKEND_API_URL = 'https://trackmail-backend1.onrender.com/v1'; // Deployed Backend API URL (Render)
+const SUPABASE_URL = 'https://vhbnxzhvbawaqrgcddo6.supabase.co'; // Your Supabase project URL
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoYm54emh2YmF3YXFyZ2NkZG82Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxODQ1MzQsImV4cCI6MjA2MTc2MDUzNH0.JV5XHlMaBn3xqXBPnZOiwn7oqlCBMQaUiH4dVEjlKbQ'; // Your Supabase anon key
 
 // Storage keys
 const SESSION_HANDLE_KEY = 'trackmail_session_handle';
 const CACHED_TOKEN_KEY = 'trackmail_cached_token';
 const CACHED_TOKEN_EXPIRES_KEY = 'trackmail_token_expires';
+const REFRESH_TOKEN_KEY = 'trackmail_refresh_token';
 const USER_EMAIL_KEY = 'trackmail_user_email';
 
 /**
- * Get the Auth Bridge URL.
+ * Get the frontend login URL where users can sign in.
  * 
- * @return {string} Auth Bridge URL
+ * @return {string} Frontend login URL
  */
-function getAuthBridgeUrl() {
-  // In production, this should be your deployed Auth Bridge URL
-  return AUTH_BRIDGE_URL;
+function getFrontendLoginUrl() {
+  return FRONTEND_LOGIN_URL + '?source=gmail-addon';
 }
 
 /**
@@ -68,6 +70,38 @@ function saveSessionHandle(sessionHandle) {
 }
 
 /**
+ * Save JWT token, refresh token, and user email from Supabase auth.
+ * This is called after user signs in on the frontend (ONE TIME SETUP).
+ * 
+ * @param {string} jwtToken - Supabase JWT access token
+ * @param {string} refreshToken - Supabase refresh token (lasts forever)
+ * @param {string} userEmail - User's email address
+ * @param {number} expiresIn - Token expiry time in seconds (default 3600 = 1 hour)
+ */
+function saveAuthToken(jwtToken, refreshToken, userEmail, expiresIn) {
+  const userProperties = PropertiesService.getUserProperties();
+  
+  // Save JWT token
+  userProperties.setProperty(CACHED_TOKEN_KEY, jwtToken);
+  
+  // Save refresh token (NEVER EXPIRES - this is the key!)
+  userProperties.setProperty(REFRESH_TOKEN_KEY, refreshToken);
+  
+  // Calculate expiry time (current time + expires_in seconds - 5 minute buffer)
+  const expiresInSeconds = expiresIn || 3600; // Default 1 hour
+  const expiresAt = new Date().getTime() + (expiresInSeconds * 1000) - 300000; // 5 min buffer
+  userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
+  
+  // Save user email
+  userProperties.setProperty(USER_EMAIL_KEY, userEmail);
+  
+  // Also save as session handle for backward compatibility
+  userProperties.setProperty(SESSION_HANDLE_KEY, jwtToken);
+  
+  console.log('Auth token and refresh token saved for user:', userEmail);
+}
+
+/**
  * Clear the stored session handle and cached tokens.
  */
 function clearSessionHandle() {
@@ -75,35 +109,121 @@ function clearSessionHandle() {
   userProperties.deleteProperty(SESSION_HANDLE_KEY);
   userProperties.deleteProperty(CACHED_TOKEN_KEY);
   userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+  userProperties.deleteProperty(REFRESH_TOKEN_KEY);
   userProperties.deleteProperty(USER_EMAIL_KEY);
   
-  console.log('Session cleared');
+  console.log('Session cleared (including refresh token)');
 }
 
 /**
- * Get a valid access token.
+ * Get a valid access token (JWT from Supabase).
  * 
  * This function checks if we have a cached token that's still valid.
- * If not, it fetches a new token from the Auth Bridge.
+ * If expired, it automatically refreshes using the refresh token.
  * 
  * @return {string|null} Access token or null if authentication fails
  */
 function getAccessToken() {
-  // For direct connection, always return a valid token
-  const sessionHandle = getSessionHandle();
-  if (sessionHandle) {
-    console.log('Using session handle as token for direct connection');
-    return sessionHandle;
+  const userProperties = PropertiesService.getUserProperties();
+  
+  // Check if we have a cached token
+  const cachedToken = userProperties.getProperty(CACHED_TOKEN_KEY);
+  const expiresAt = userProperties.getProperty(CACHED_TOKEN_EXPIRES_KEY);
+  
+  if (cachedToken && expiresAt) {
+    const now = new Date().getTime();
+    if (now < parseInt(expiresAt)) {
+      console.log('Using cached token (valid)');
+      return cachedToken;
+    } else {
+      console.log('Cached token expired - attempting refresh');
+      
+      // Try to refresh the token automatically
+      const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
+      if (refreshToken) {
+        const newToken = refreshAccessToken(refreshToken);
+        if (newToken) {
+          console.log('Token refreshed successfully');
+          return newToken;
+        }
+      }
+      
+      // Refresh failed - clear expired tokens
+      userProperties.deleteProperty(CACHED_TOKEN_KEY);
+      userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+    }
   }
   
-  // If no session handle, create a default one
-  console.log('Creating default token for direct connection');
-  const userProperties = PropertiesService.getUserProperties();
-  const defaultToken = 'direct_connection_' + Date.now();
-  userProperties.setProperty(SESSION_HANDLE_KEY, defaultToken);
-  userProperties.setProperty(USER_EMAIL_KEY, 'aglonoop@gmail.com');
-  
-  return defaultToken;
+  // No valid token - user needs to sign in
+  console.log('No valid access token found');
+  return null;
+}
+
+/**
+ * Refresh the access token using the refresh token.
+ * This is called automatically when the access token expires.
+ * 
+ * @param {string} refreshToken - Supabase refresh token
+ * @return {string|null} New access token or null if refresh fails
+ */
+function refreshAccessToken(refreshToken) {
+  try {
+    console.log('Refreshing access token...');
+    
+    // Call Supabase auth API to refresh the token
+    const url = SUPABASE_URL + '/auth/v1/token?grant_type=refresh_token';
+    
+    const payload = {
+      refresh_token: refreshToken
+    };
+    
+    const options = {
+      method: 'post',
+      contentType: 'application/json',
+      headers: {
+        'apikey': SUPABASE_ANON_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_ANON_KEY
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    const response = UrlFetchApp.fetch(url, options);
+    const statusCode = response.getResponseCode();
+    
+    if (statusCode !== 200) {
+      console.error('Token refresh failed:', statusCode, response.getContentText());
+      return null;
+    }
+    
+    const data = JSON.parse(response.getContentText());
+    
+    if (!data.access_token) {
+      console.error('No access token in refresh response');
+      return null;
+    }
+    
+    // Save the new tokens
+    const userProperties = PropertiesService.getUserProperties();
+    userProperties.setProperty(CACHED_TOKEN_KEY, data.access_token);
+    
+    // Update refresh token if a new one is provided
+    if (data.refresh_token) {
+      userProperties.setProperty(REFRESH_TOKEN_KEY, data.refresh_token);
+    }
+    
+    // Calculate new expiry time
+    const expiresInSeconds = data.expires_in || 3600;
+    const expiresAt = new Date().getTime() + (expiresInSeconds * 1000) - 300000;
+    userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
+    
+    console.log('Token refresh successful');
+    return data.access_token;
+    
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return null;
+  }
 }
 
 /**

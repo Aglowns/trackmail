@@ -552,53 +552,296 @@ function fetchEmailData(messageId, accessToken) {
  * @return {Card} The card to display
  */
 function openTokenPageAction(e) {
-  console.log('openTokenPageAction triggered - connecting directly');
+  console.log('openTokenPageAction triggered - opening sign-in instructions');
 
   try {
-    // Directly connect without requiring a token
-    const userProperties = PropertiesService.getUserProperties();
-    userProperties.setProperty(SESSION_HANDLE_KEY, 'direct_connection_' + Date.now());
-    userProperties.setProperty(USER_EMAIL_KEY, 'aglonoop@gmail.com');
-    
-    console.log('Direct authentication completed');
+    const loginUrl = getFrontendLoginUrl();
     
     return CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
           .setTitle('📧 TrackMail')
-          .setSubtitle('Connected Successfully')
+          .setSubtitle('Sign In Required')
       )
       .addSection(
         CardService.newCardSection()
           .addWidget(
             CardService.newTextParagraph()
-              .setText('✅ Your TrackMail account has been connected!')
+              .setText('<b>👋 Welcome to TrackMail!</b>')
           )
           .addWidget(
             CardService.newTextParagraph()
-              .setText('You can now track job applications directly from Gmail.')
+              .setText('To get started, you need to sign in with your Gmail account on the TrackMail website.')
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .setHeader('Setup Steps:')
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<b>1.</b> Click "Open TrackMail" below<br>' +
+                       '<b>2.</b> Sign in with <b>this Gmail account</b> (' + Session.getActiveUser().getEmail() + ')<br>' +
+                       '<b>3.</b> Come back here and click "I\'ve Signed In"')
           )
       )
       .addSection(
         CardService.newCardSection()
           .addWidget(
             CardService.newTextButton()
-              .setText('Continue')
+              .setText('🌐 Open TrackMail')
               .setBackgroundColor('#667eea')
+              .setOpenLink(
+                CardService.newOpenLink()
+                  .setUrl(loginUrl)
+                  .setOpenAs(CardService.OpenAs.FULL_SIZE)
+                  .setOnClose(CardService.OnClose.NOTHING)
+              )
+          )
+          .addWidget(
+            CardService.newTextButton()
+              .setText('✅ I\'ve Signed In')
               .setOnClickAction(
                 CardService.newAction()
-                  .setFunctionName('onGmailMessageOpen')
+                  .setFunctionName('checkAuthenticationAction')
               )
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<font color="#6b7280"><i>💡 Tip: Use the same Gmail account for both the website and this add-on so your applications sync correctly.</i></font>')
           )
       )
       .build();
 
   } catch (error) {
-    console.error('Error in direct authentication:', error);
-    return buildErrorCard('Failed to connect account: ' + error.message);
+    console.error('Error in openTokenPageAction:', error);
+    return buildErrorCard('Failed to show sign-in instructions: ' + error.message);
   }
 }
 
+
+/**
+ * Check if user has authenticated by testing the backend connection.
+ * This is called after user claims they've signed in on the frontend.
+ * 
+ * @param {Object} e - Event object
+ * @return {ActionResponse} Navigation action
+ */
+function checkAuthenticationAction(e) {
+  console.log('checkAuthenticationAction triggered');
+  
+  try {
+    // Try to get the user's email from their Gmail session
+    const userEmail = Session.getActiveUser().getEmail();
+    
+    return CardService.newCardBuilder()
+      .setHeader(
+        CardService.newCardHeader()
+          .setTitle('📧 TrackMail')
+          .setSubtitle('Connect Your Account')
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<b>🔐 One-Time Setup</b>')
+          )
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('Get your connection token from the TrackMail website. <b>You only need to do this once!</b>')
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .setHeader('Quick Steps:')
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<b>1.</b> Click "Open Settings" below<br>' +
+                       '<b>2.</b> Sign in with: <b>' + userEmail + '</b><br>' +
+                       '<b>3.</b> Find "Gmail Add-on" section<br>' +
+                       '<b>4.</b> Copy the token shown<br>' +
+                       '<b>5.</b> Come back and paste it below')
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextButton()
+              .setText('🌐 Open Settings')
+              .setBackgroundColor('#667eea')
+              .setOpenLink(
+                CardService.newOpenLink()
+                  .setUrl('https://trackmail-frontend.vercel.app/settings?tab=gmail-addon')
+                  .setOpenAs(CardService.OpenAs.FULL_SIZE)
+                  .setOnClose(CardService.OnClose.NOTHING)
+              )
+          )
+          .addWidget(
+            CardService.newTextButton()
+              .setText('✏️ Paste Token')
+              .setOnClickAction(
+                CardService.newAction()
+                  .setFunctionName('showTokenInputCard')
+              )
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<font color="#16a34a"><b>✨ After this, everything works automatically forever!</b></font><br><br>' +
+                       '<font color="#6b7280"><i>💡 The token refreshes itself automatically, so you never have to do this again.</i></font>')
+          )
+      )
+      .build();
+    
+  } catch (error) {
+    console.error('Error in checkAuthenticationAction:', error);
+    return buildErrorCard('Failed to show connection instructions: ' + error.message);
+  }
+}
+
+/**
+ * Show card with instructions and text input for pasting the refresh token.
+ * 
+ * @param {Object} e - Event object
+ * @return {Card} Token input card
+ */
+function showTokenInputCard(e) {
+  console.log('showTokenInputCard triggered');
+  
+  try {
+    return CardService.newCardBuilder()
+      .setHeader(
+        CardService.newCardHeader()
+          .setTitle('📧 TrackMail')
+          .setSubtitle('Paste Your Token')
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextParagraph()
+              .setText('<b>Paste the token you copied from the Settings page:</b>')
+          )
+          .addWidget(
+            CardService.newTextInput()
+              .setFieldName('refresh_token')
+              .setTitle('Refresh Token')
+              .setHint('Paste your token here')
+              .setMultiline(true)
+          )
+      )
+      .addSection(
+        CardService.newCardSection()
+          .addWidget(
+            CardService.newTextButton()
+              .setText('✅ Connect')
+              .setBackgroundColor('#667eea')
+              .setOnClickAction(
+                CardService.newAction()
+                  .setFunctionName('saveTokenAndConnect')
+              )
+          )
+          .addWidget(
+            CardService.newTextButton()
+              .setText('← Back')
+              .setOnClickAction(
+                CardService.newAction()
+                  .setFunctionName('checkAuthenticationAction')
+              )
+          )
+      )
+      .build();
+    
+  } catch (error) {
+    console.error('Error in showTokenInputCard:', error);
+    return buildErrorCard('Failed to show token input: ' + error.message);
+  }
+}
+
+/**
+ * Save the pasted refresh token and attempt to connect.
+ * 
+ * @param {Object} e - Event object with form inputs
+ * @return {ActionResponse} Navigation action
+ */
+function saveTokenAndConnect(e) {
+  console.log('saveTokenAndConnect triggered');
+  
+  try {
+    const formInputs = e.formInput || {};
+    const refreshToken = formInputs.refresh_token;
+    
+    if (!refreshToken || refreshToken.trim() === '') {
+      return buildErrorCard('Please paste a valid token');
+    }
+    
+    // Try to use this refresh token to get an access token
+    console.log('Attempting to refresh token...');
+    const accessToken = refreshAccessToken(refreshToken.trim());
+    
+    if (!accessToken) {
+      return buildErrorCard('Invalid token or connection failed. Please make sure you copied the entire token from the Settings page.');
+    }
+    
+    // Success! Token is valid and saved
+    const userEmail = getUserEmail() || Session.getActiveUser().getEmail();
+    
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().updateCard(
+          CardService.newCardBuilder()
+            .setHeader(
+              CardService.newCardHeader()
+                .setTitle('📧 TrackMail')
+                .setSubtitle('Connected!')
+            )
+            .addSection(
+              CardService.newCardSection()
+                .addWidget(
+                  CardService.newTextParagraph()
+                    .setText('<b>✅ Successfully Connected!</b>')
+                )
+                .addWidget(
+                  CardService.newTextParagraph()
+                    .setText('<font color="#16a34a">Your Gmail add-on is now connected to your TrackMail account.</font>')
+                )
+            )
+            .addSection(
+              CardService.newCardSection()
+                .setHeader('What\'s Next?')
+                .addWidget(
+                  CardService.newTextParagraph()
+                    .setText('• Open any job application email<br>' +
+                             '• Click "Track This Application"<br>' +
+                             '• Your applications will automatically sync to TrackMail<br><br>' +
+                             '<b>Signed in as:</b> ' + userEmail)
+                )
+            )
+            .addSection(
+              CardService.newCardSection()
+                .addWidget(
+                  CardService.newTextButton()
+                    .setText('🎉 Start Tracking')
+                    .setBackgroundColor('#667eea')
+                    .setOnClickAction(
+                      CardService.newAction()
+                        .setFunctionName('onGmailMessageOpen')
+                    )
+                )
+            )
+            .build()
+        )
+      )
+      .build();
+    
+  } catch (error) {
+    console.error('Error in saveTokenAndConnect:', error);
+    return buildErrorCard('Failed to save token: ' + error.message);
+  }
+}
 
 /**
  * Test function to manually set up authentication for testing
@@ -935,4 +1178,5 @@ function testAIStatusDetection() {
     };
   }
 }
+
 
