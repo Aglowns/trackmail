@@ -22,11 +22,12 @@ function onGmailMessageOpen(e) {
   console.log('onGmailMessageOpen triggered');
   
   try {
-    // Check if user is authenticated by verifying we have a valid access token
-    // This is more reliable than checking sessionHandle alone
+    // Check if user is authenticated by verifying we have a valid token
+    // Prefer cached access token; otherwise accept installation token
     const accessToken = getAccessToken();
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
     
-    if (!accessToken) {
+    if (!accessToken && !installationToken) {
       // User not authenticated - show sign-in card
       console.log('No valid access token found - showing sign-in card');
       return buildSignInCard();
@@ -563,8 +564,9 @@ function openTokenPageAction(e) {
   try {
     // Check if user is already authenticated
     const accessToken = getAccessToken();
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
     
-    if (accessToken) {
+    if (accessToken || installationToken) {
       // User is already authenticated - show success card with "Start Tracking" button
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -651,8 +653,9 @@ function checkAuthenticationAction(e) {
   try {
     // Check if user is already authenticated
     const accessToken = getAccessToken();
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
     
-    if (accessToken) {
+    if (accessToken || installationToken) {
       // User is already authenticated - show success card
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -740,8 +743,9 @@ function showTokenInputCard(e) {
   try {
     // Check if user is already authenticated
     const accessToken = getAccessToken();
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
     
-    if (accessToken) {
+    if (accessToken || installationToken) {
       // User is already authenticated - show success card
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -836,16 +840,13 @@ function saveTokenAndConnect(e) {
         const userEmail = payload.email || Session.getActiveUser().getEmail();
         const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
         
-        // Save the access token (no refresh token available in this flow)
+        // Treat this as an installation token (long-lived) and save it for future use
         const userProperties = PropertiesService.getUserProperties();
-        userProperties.setProperty(CACHED_TOKEN_KEY, token);
+        userProperties.setProperty(INSTALLATION_TOKEN_KEY, token);
         userProperties.setProperty(USER_EMAIL_KEY, userEmail);
         
-        // Also save as session handle for backward compatibility
-        userProperties.setProperty(SESSION_HANDLE_KEY, token);
-        
-        // Calculate expiry time
-        const expiresAt = new Date().getTime() + (expiresIn * 1000) - 300000; // 5 min buffer
+        // Also cache a temporary token window to avoid immediate refresh calls
+        const expiresAt = new Date().getTime() + (30 * 60 * 1000); // 30 min soft window
         userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
         
         console.log('Access token saved successfully for user:', userEmail);

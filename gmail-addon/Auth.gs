@@ -23,6 +23,7 @@ const SESSION_HANDLE_KEY = 'trackmail_session_handle';
 const CACHED_TOKEN_KEY = 'trackmail_cached_token';
 const CACHED_TOKEN_EXPIRES_KEY = 'trackmail_token_expires';
 const REFRESH_TOKEN_KEY = 'trackmail_refresh_token';
+const INSTALLATION_TOKEN_KEY = 'trackmail_installation_token';
 const USER_EMAIL_KEY = 'trackmail_user_email';
 
 /**
@@ -367,10 +368,15 @@ function makeAuthenticatedRequest(endpoint, options) {
     
     // Prepare the request
     const url = BACKEND_API_URL + endpoint;
+
+    // Prefer cached short-lived access token; otherwise fall back to installation token
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+
+    const authorizationToken = accessToken || installationToken || '';
     const requestOptions = {
       method: options.method || 'GET',
       headers: {
-        'Authorization': `Bearer ${accessToken}`,
+        'Authorization': `Bearer ${authorizationToken}`,
         'Content-Type': 'application/json'
       },
       muteHttpExceptions: true
