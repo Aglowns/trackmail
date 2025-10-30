@@ -190,14 +190,38 @@ async def ingest_email(
     
     # Step 4: Create application
     try:
-        print(f"🔍 CRITICAL DEBUG: About to create application with status: '{parsed.get('status', 'applied')}'")
+        # Sanitize/normalize status to match backend enum
+        allowed_statuses = {
+            "wishlist", "applied", "screening", "interviewing", "interview_scheduled",
+            "interview_completed", "offer", "offer_received", "rejected", "accepted", "withdrawn"
+        }
+        status_map = {
+            # common variants
+            "reject": "rejected",
+            "rejection": "rejected",
+            "declined": "rejected",
+            "decline": "rejected",
+            "offer received": "offer_received",
+            "offer_received": "offer_received",
+            "offeraccepted": "accepted",
+            "accepted offer": "accepted",
+            "interview": "interviewing",
+            "interviews": "interviewing",
+            "screen": "screening",
+        }
+        raw_status = (parsed.get("status") or "").strip().lower()
+        normalized_status = status_map.get(raw_status, raw_status)
+        if normalized_status not in allowed_statuses:
+            normalized_status = "applied"
+
+        print(f"🔍 CRITICAL DEBUG: About to create application with status: '{normalized_status}' (raw: '{raw_status}')")
         print(f"🔍 CRITICAL DEBUG: parsed data keys: {list(parsed.keys())}")
         print(f"🔍 CRITICAL DEBUG: parsed status value: '{parsed.get('status')}' (type: {type(parsed.get('status'))})")
         
         app_data = ApplicationCreate(
             company=parsed["company"],
             position=parsed["position"],
-            status=parsed.get("status", "applied"),
+            status=normalized_status,
             notes=f"Auto-created from email. Confidence: {parsed.get('confidence', 0)}",
         )
         
