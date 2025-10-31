@@ -17,6 +17,7 @@ from typing import Optional, List, Dict, Any
 
 from supabase import Client
 from app.schemas import EmailIngest
+from app.db import get_supabase_client
 
 
 class EmailService:
