@@ -73,9 +73,29 @@ function ingestEmail(emailData) {
     
     // Check if it's a 500 server error
     if ((apiError && apiError.status === 500) || error.message.includes('500') || error.message.includes('Server error')) {
+      // Extract the actual backend error message from the raw response
+      let backendErrorMessage = 'Server error occurred. Please try again in a few moments.';
+      
+      if (apiError && apiError.raw) {
+        try {
+          // Try to parse the raw response as JSON
+          const rawJson = JSON.parse(apiError.raw);
+          if (rawJson.detail) {
+            backendErrorMessage = rawJson.detail;
+          }
+        } catch (e) {
+          // If not JSON, check if it's a plain error message
+          if (apiError.raw.length < 500) {
+            backendErrorMessage = apiError.raw;
+          }
+        }
+      } else if (apiError && apiError.message) {
+        backendErrorMessage = apiError.message;
+      }
+      
       return {
         success: false,
-        message: apiError && apiError.message ? apiError.message : 'Server error occurred. Please try again in a few moments.',
+        message: backendErrorMessage,
         error_type: 'server_error',
         detail: apiError ? (apiError.detail || apiError.message) : error.message,
         raw_response: apiError ? apiError.raw : undefined
