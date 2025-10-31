@@ -241,10 +241,37 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
     }
     
     # Insert into database
-    result = supabase.table("applications").insert(app_data).execute()
+    try:
+        result = supabase.table("applications").insert(app_data).execute()
+    except Exception as exc:  # pragma: no cover - log full context for production debugging
+        print(
+            "❌ Supabase insert exception in create_application:",
+            {
+                "user_id": user_id,
+                "company": data.company,
+                "position": data.position,
+                "status": data.status,
+                "error": repr(exc),
+            },
+        )
+        raise
+    
+    error = getattr(result, "error", None)
+    if error:
+        print(
+            "❌ Supabase insert error in create_application:",
+            {
+                "user_id": user_id,
+                "company": data.company,
+                "position": data.position,
+                "status": data.status,
+                "error": error,
+            },
+        )
+        raise Exception(f"Supabase error creating application: {error}")
     
     if not result.data:
-        raise Exception("Failed to create application")
+        raise Exception("Failed to create application: empty response")
     
     return result.data[0]
 

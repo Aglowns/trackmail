@@ -22,6 +22,7 @@ from app.services.emails import (
     check_duplicate_email,
 )
 from app.services.applications import create_application
+from app.services import profiles as profile_service
 
 # Create router for email ingestion endpoints
 router = APIRouter(prefix="/ingest", tags=["Email Ingestion"])
@@ -82,6 +83,12 @@ async def ingest_email(
             "duplicate": true
         }
     """
+    # Step 0: Ensure the user profile exists so foreign key constraints pass
+    try:
+        await profile_service.create_default_profile(user_id)
+    except Exception as exc:  # pragma: no cover - log but don't block ingestion
+        print(f"⚠️ Failed to ensure default profile for {user_id}: {exc}")
+
     # Step 1: Check for duplicate email
     email_hash = generate_email_hash(email_data)
     existing_email = await check_duplicate_email(email_hash)
