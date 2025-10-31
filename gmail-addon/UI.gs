@@ -33,7 +33,7 @@ function buildSignInCard() {
         .addWidget(
           CardService.newTextButton()
             .setText('🚀 Get Started')
-            .setBackgroundColor('#667eea')
+            .setBackgroundColor('#6366f1')
             .setOnClickAction(
               CardService.newAction()
                 .setFunctionName('openTokenPageAction')
@@ -198,7 +198,7 @@ function buildTrackingCard(messageId, accessToken) {
       .addWidget(
         CardService.newTextButton()
           .setText('📌 Track This Application')
-          .setBackgroundColor('#667eea')
+          .setBackgroundColor('#6366f1')
           .setOnClickAction(
             CardService.newAction()
               .setFunctionName('trackApplicationAction')

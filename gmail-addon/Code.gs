@@ -830,7 +830,7 @@ function showTokenInputCard(e) {
           .addWidget(
             CardService.newTextButton()
               .setText('✅ Connect')
-              .setBackgroundColor('#667eea')
+              .setBackgroundColor('#6366f1')
               .setOnClickAction(
                 CardService.newAction()
                   .setFunctionName('saveTokenAndConnect')
