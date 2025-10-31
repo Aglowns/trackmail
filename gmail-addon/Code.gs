@@ -880,37 +880,33 @@ function saveTokenAndConnect(e) {
     console.log('Token length:', token.length);
     
     if (isAccessToken) {
-      // User pasted an access token directly - save it and extract email
       console.log('Validating and saving access token...');
-      
-      // Parse the JWT to extract user email
-      const parts = token.split('.');
-      if (parts.length !== 3) {
+
+      const payload = decodeJwtPayload(token);
+      if (!payload) {
         return buildErrorCard('Invalid token format. Please copy the entire token from Settings.');
       }
-      
-      try {
-        const payload = JSON.parse(Utilities.newBlob(Utilities.base64Decode(parts[1])).getDataAsString());
-        const userEmail = payload.email || Session.getActiveUser().getEmail();
-        const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
-        
-        // Treat this as an installation token (long-lived) and save it for future use
-        const userProperties = PropertiesService.getUserProperties();
-        userProperties.setProperty(INSTALLATION_TOKEN_KEY, token);
-        userProperties.setProperty(USER_EMAIL_KEY, userEmail);
-        
-        // Also cache a temporary token window to avoid immediate refresh calls
-        const expiresAt = new Date().getTime() + (30 * 60 * 1000); // 30 min soft window
-        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
-        
-        console.log('Access token saved successfully for user:', userEmail);
-        console.log('Token expires in:', Math.floor(expiresIn / 60), 'minutes');
-        
-      } catch (parseError) {
-        console.error('Failed to parse JWT:', parseError);
-        return buildErrorCard('Invalid token format. Please copy the token from the Settings page.');
+
+      const userEmail = payload.email || Session.getActiveUser().getEmail();
+      const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
+
+      const userProperties = PropertiesService.getUserProperties();
+      userProperties.setProperty(INSTALLATION_TOKEN_KEY, token);
+      userProperties.setProperty(SESSION_HANDLE_KEY, token);
+      userProperties.setProperty(CACHED_TOKEN_KEY, token);
+      userProperties.setProperty(USER_EMAIL_KEY, userEmail);
+
+      const expiresAt = payload.exp ? (payload.exp * 1000) : new Date().getTime() + (expiresIn * 1000);
+      userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (expiresAt - 300000).toString());
+
+      console.log('Access token saved successfully for user:', userEmail);
+      console.log('Token expires in:', Math.floor(expiresIn / 60), 'minutes');
+
+      const refreshToken = payload.refresh_token || null;
+      if (refreshToken) {
+        userProperties.setProperty(REFRESH_TOKEN_KEY, refreshToken);
       }
-      
+
     } else {
       // User pasted a refresh token - exchange it for an access token
       console.log('Attempting to exchange refresh token for access token...');

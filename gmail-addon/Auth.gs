@@ -126,39 +126,59 @@ function clearSessionHandle() {
  */
 function getAccessToken() {
   const userProperties = PropertiesService.getUserProperties();
-  
-  // Check if we have a cached token
   const cachedToken = userProperties.getProperty(CACHED_TOKEN_KEY);
   const expiresAt = userProperties.getProperty(CACHED_TOKEN_EXPIRES_KEY);
-  
+
   if (cachedToken && expiresAt) {
-    const now = new Date().getTime();
-    if (now < parseInt(expiresAt)) {
+    const now = Date.now();
+    if (now < parseInt(expiresAt, 10)) {
       console.log('Using cached token (valid)');
       return cachedToken;
-    } else {
-      console.log('Cached token expired - attempting refresh');
-      
-      // Try to refresh the token automatically
-      const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
-      if (refreshToken && refreshToken.length > 20) { // Only try if we have a real refresh token
-        console.log('Attempting to refresh using stored refresh token...');
-        const newToken = refreshAccessToken(refreshToken);
-        if (newToken) {
-          console.log('Token refreshed successfully');
-          return newToken;
-        }
-      } else {
-        console.log('No valid refresh token available - user will need to re-authenticate');
-      }
-      
-      // Refresh failed or not available - clear expired tokens
-      userProperties.deleteProperty(CACHED_TOKEN_KEY);
-      userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
     }
+
+    console.log('Cached token expired - attempting refresh');
+    const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
+    if (refreshToken && refreshToken.length > 20) {
+      console.log('Attempting to refresh using stored refresh token...');
+      const newToken = refreshAccessToken(refreshToken);
+      if (newToken) {
+        console.log('Token refreshed successfully');
+        return newToken;
+      }
+    } else {
+      console.log('No valid refresh token available - falling back to installation token');
+    }
+
+    userProperties.deleteProperty(CACHED_TOKEN_KEY);
+    userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
   }
-  
-  // No valid token - user needs to sign in
+
+  const installationToken = userProperties.getProperty(INSTALLATION_TOKEN_KEY);
+  if (installationToken) {
+    const payload = decodeJwtPayload(installationToken) || {};
+    const exp = payload.exp ? payload.exp * 1000 : null;
+    const now = Date.now();
+
+    if (!exp || now < exp - 300000) {
+      console.log('Using installation token for authentication');
+
+      userProperties.setProperty(CACHED_TOKEN_KEY, installationToken);
+      if (exp) {
+        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (exp - 300000).toString());
+      } else {
+        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (now + 6 * 60 * 60 * 1000).toString());
+      }
+
+      if (payload.email) {
+        userProperties.setProperty(USER_EMAIL_KEY, payload.email);
+      }
+
+      return installationToken;
+    }
+
+    console.warn('Installation token appears expired - user must reauthenticate');
+  }
+
   console.log('No valid access token found - authentication required');
   return null;
 }
