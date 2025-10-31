@@ -84,10 +84,25 @@ async def ingest_email(
         }
     """
     # Step 0: Ensure the user profile exists so foreign key constraints pass
+    print(f"🔍 INGEST DEBUG: Starting ingestion for user_id={user_id}")
+    print(f"🔍 INGEST DEBUG: Email subject={email_data.subject}, sender={email_data.sender}")
+    
     try:
-        await profile_service.create_default_profile(user_id)
-    except Exception as exc:  # pragma: no cover - log but don't block ingestion
-        print(f"⚠️ Failed to ensure default profile for {user_id}: {exc}")
+        profile = await profile_service.get_profile(user_id)
+        if profile:
+            print(f"✅ Profile exists for user {user_id}: {profile.get('email')}")
+        else:
+            print(f"⚠️ No profile found for user {user_id}, creating default profile...")
+            profile = await profile_service.create_default_profile(user_id)
+            print(f"✅ Created default profile for user {user_id}: {profile.get('email')}")
+    except Exception as exc:  # pragma: no cover - log and fail fast
+        print(f"❌ CRITICAL: Failed to ensure profile for {user_id}: {exc}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Profile error: {str(exc)}"
+        )
 
     # Step 1: Check for duplicate email
     email_hash = generate_email_hash(email_data)
@@ -224,6 +239,8 @@ async def ingest_email(
         print(f"🔍 CRITICAL DEBUG: About to create application with status: '{normalized_status}' (raw: '{raw_status}')")
         print(f"🔍 CRITICAL DEBUG: parsed data keys: {list(parsed.keys())}")
         print(f"🔍 CRITICAL DEBUG: parsed status value: '{parsed.get('status')}' (type: {type(parsed.get('status'))})")
+        print(f"🔍 CRITICAL DEBUG: parsed company: '{parsed.get('company')}'")
+        print(f"🔍 CRITICAL DEBUG: parsed position: '{parsed.get('position')}'")
         
         app_data = ApplicationCreate(
             company=parsed["company"],
@@ -232,15 +249,32 @@ async def ingest_email(
             notes=f"Auto-created from email. Confidence: {parsed.get('confidence', 0)}",
         )
         
-        print(f"🔍 CRITICAL DEBUG: ApplicationCreate object status: '{app_data.status}'")
+        print(f"🔍 CRITICAL DEBUG: ApplicationCreate object created: company='{app_data.company}', position='{app_data.position}', status='{app_data.status}'")
+        print(f"🔍 CRITICAL DEBUG: Calling create_application for user_id={user_id}")
         
-        application = await create_application(user_id=user_id, data=app_data)
-        application_id = application["id"]
+        try:
+            application = await create_application(user_id=user_id, data=app_data)
+            print(f"✅ Application created successfully: {application.get('id')}")
+            application_id = application["id"]
+        except Exception as create_exc:
+            print(f"❌ CRITICAL: create_application failed: {create_exc}")
+            import traceback
+            print(f"Traceback: {traceback.format_exc()}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=f"Failed to create application: {str(create_exc)}"
+            )
         
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
     except Exception as e:
+        print(f"❌ CRITICAL: Unexpected error in application creation block: {e}")
+        import traceback
+        print(f"Traceback: {traceback.format_exc()}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create application: {str(e)}"
+            detail=f"Unexpected error: {str(e)}"
         )
     
     # Step 5: Store email message linked to application
