@@ -111,6 +111,7 @@ function clearSessionHandle() {
   userProperties.deleteProperty(CACHED_TOKEN_KEY);
   userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
   userProperties.deleteProperty(REFRESH_TOKEN_KEY);
+  userProperties.deleteProperty(INSTALLATION_TOKEN_KEY);
   userProperties.deleteProperty(USER_EMAIL_KEY);
   
   console.log('Session cleared (including refresh token)');
