@@ -13,7 +13,7 @@
  */
 
 // Configuration
-const FRONTEND_LOGIN_URL = 'https://trackmail-frontend.vercel.app/login'; // Frontend login page
+const FRONTEND_LOGIN_URL = 'https://jobmail-frontend.vercel.app/login'; // Frontend login page
 const BACKEND_API_URL = 'https://trackmail-backend1.onrender.com/v1'; // Deployed Backend API URL (Render)
 const SUPABASE_URL = 'https://vhbnxzhvbawaqrgcddo6.supabase.co'; // Your Supabase project URL
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoYm54emh2YmF3YXFyZ2NkZG82Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxODQ1MzQsImV4cCI6MjA2MTc2MDUzNH0.JV5XHlMaBn3xqXBPnZOiwn7oqlCBMQaUiH4dVEjlKbQ'; // Your Supabase anon key
