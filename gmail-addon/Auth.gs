@@ -179,26 +179,45 @@ function getAccessToken() {
 
   if (cachedToken && expiresAt) {
     const now = Date.now();
-    if (now < parseInt(expiresAt, 10)) {
+    const expiryTime = parseInt(expiresAt, 10);
+    const timeUntilExpiry = expiryTime - now;
+    
+    // Check if token is still valid (with 5 minute buffer)
+    if (now < expiryTime - (5 * 60 * 1000)) {
       console.log('✅ Using cached short-lived access token (still valid)');
+      console.log('Token expires in:', Math.floor(timeUntilExpiry / (1000 * 60)), 'minutes');
       return cachedToken;
     }
-
-    // Cached token expired - try to refresh
-    console.log('Cached token expired - attempting refresh');
+    
+    // Token is expiring soon (within 5 minutes) or already expired - proactively refresh
+    console.log('⚠️ Cached token expiring soon or expired - proactively refreshing');
+    console.log('Time until expiry:', Math.floor(timeUntilExpiry / 1000), 'seconds');
+    
     const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
     if (refreshToken && refreshToken.length > 20) {
-      console.log('Attempting to refresh using stored refresh token...');
+      console.log('Attempting proactive refresh using stored refresh token...');
       const newToken = refreshAccessToken(refreshToken);
       if (newToken) {
-        console.log('✅ Token refreshed successfully');
+        console.log('✅ Token proactively refreshed before expiry');
         return newToken;
+      } else {
+        console.warn('⚠️ Proactive refresh failed - token may still work for a bit');
+        // Return the cached token anyway - it might still work for a few more minutes
+        // The automatic refresh in makeAuthenticatedRequest will handle 401 errors
+        return cachedToken;
       }
     }
 
-    // Clear expired cached token
-    userProperties.deleteProperty(CACHED_TOKEN_KEY);
-    userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+    // Clear expired cached token if we can't refresh
+    if (timeUntilExpiry < -(60 * 60 * 1000)) { // Only clear if expired more than 1 hour ago
+      console.warn('Token expired more than 1 hour ago - clearing');
+      userProperties.deleteProperty(CACHED_TOKEN_KEY);
+      userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+    } else {
+      // Return the token anyway - let makeAuthenticatedRequest handle the refresh
+      console.log('Returning token - will auto-refresh on 401 if needed');
+      return cachedToken;
+    }
   }
 
   // PRIORITY 3: Try refresh token directly (if no cached token exists)
