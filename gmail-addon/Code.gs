@@ -862,7 +862,7 @@ function checkAuthenticationAction(e) {
               .setBackgroundColor('#667eea')
               .setOpenLink(
                 CardService.newOpenLink()
-                  .setUrl('https://jobmail-frontend.vercel.app/settings?tab=gmail-addon')
+                  .setUrl('https://trackmail-frontend.vercel.app/settings?tab=gmail-addon')
                   .setOpenAs(CardService.OpenAs.FULL_SIZE)
                   .setOnClose(CardService.OnClose.NOTHING)
               )
