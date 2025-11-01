@@ -3,7 +3,7 @@
   "exceptionLogging": "STACKDRIVER",
   "runtimeVersion": "V8",
   "gmail": {
-    "name": "TrackMail",
+    "name": "JobMail",
     "logoUrl": "https://www.gstatic.com/images/branding/product/1x/gmail_48dp.png",
     "primaryColor": "#667eea",
     "secondaryColor": "#764ba2",
@@ -16,7 +16,7 @@
     "composeTrigger": {
       "selectActions": [
         {
-          "text": "TrackMail",
+          "text": "JobMail",
           "runFunction": "onGmailCompose"
         }
       ],

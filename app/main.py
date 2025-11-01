@@ -1,7 +1,7 @@
 """
-TrackMail FastAPI Application
+JobMail FastAPI Application
 
-This is the main entry point for the TrackMail backend API.
+This is the main entry point for the JobMail backend API.
 
 FastAPI is a modern, fast web framework for building APIs with Python.
 Key features we use:
@@ -23,7 +23,7 @@ from app.routers import applications, events, ingest, health, profiles, auth
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: D401
     """Manage application startup and shutdown."""
-    print(f"🚀 TrackMail API starting in {settings.environment} mode")
+    print(f"🚀 JobMail API starting in {settings.environment} mode")
     print("📝 Docs available at /docs")
     print("🔧 Backend redeployed - checking connectivity...")
     print("🚀 Route fix applied - status-groups should work now")
@@ -31,11 +31,11 @@ async def lifespan(app: FastAPI):  # noqa: D401
     try:
         yield
     finally:
-        print("👋 TrackMail API shutting down")
+        print("👋 JobMail API shutting down")
 
 # Create FastAPI application instance
 app = FastAPI(
-    title="TrackMail API",
+    title="JobMail API",
     description="Job application tracking system with email parsing",
     version="0.1.0",
     # OpenAPI documentation configuration
@@ -91,7 +91,7 @@ async def root() -> dict[str, str]:
         dict: API name, version, and documentation URL
     """
     return {
-        "name": "TrackMail API",
+        "name": "JobMail API",
         "version": "0.1.0",
         "docs": "/docs",
         "health": "/health",

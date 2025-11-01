@@ -9,7 +9,7 @@ What is JWT?
 - Contains claims (pieces of information) like user ID, expiration time
 - Supabase Auth generates JWTs when users log in
 
-How it works in TrackMail:
+How it works in JobMail:
 1. User logs in via Supabase Auth (frontend)
 2. Supabase returns a JWT access token
 3. Frontend sends token in Authorization header: "Bearer <token>"

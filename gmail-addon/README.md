@@ -1,4 +1,4 @@
-# TrackMail Gmail Add-on
+# JobMail Gmail Add-on
 
 A Gmail Add-on for automatically tracking job application emails.
 
@@ -26,7 +26,7 @@ gmail-addon/
 
 ### Prerequisites
 
-1. **TrackMail Backend**: Running backend API (see main project README)
+1. **JobMail Backend**: Running backend API (see main project README)
 2. **Auth Bridge Service**: Deployed auth bridge service (see auth-bridge/README.md)
 3. **Google Account**: For developing and testing the add-on
 
@@ -34,7 +34,7 @@ gmail-addon/
 
 1. Go to [script.google.com](https://script.google.com)
 2. Click **New Project**
-3. Name it "TrackMail"
+3. Name it "JobMail"
 
 ### Step 2: Add the Code Files
 
@@ -77,9 +77,9 @@ const BACKEND_API_URL = 'https://your-api.com/v1';      // Your backend API URL
 
 1. Open Gmail in the window that was just opened
 2. Open any email (preferably a job application email)
-3. Look for the TrackMail icon in the right sidebar
+3. Look for the JobMail icon in the right sidebar
 4. Click it to open the add-on
-5. Click **Sign In with TrackMail**
+5. Click **Sign In with JobMail**
 6. A new window will open for authentication
 7. Sign in and copy your session handle
 8. Paste it into the add-on
@@ -90,7 +90,7 @@ const BACKEND_API_URL = 'https://your-api.com/v1';      // Your backend API URL
 ### First Time Setup
 
 1. **Sign In**:
-   - Click "Sign In with TrackMail"
+   - Click "Sign In with JobMail"
    - Complete authentication in the browser window
    - Copy your session handle
    - Paste it into the add-on and click "Save Session"
@@ -125,7 +125,7 @@ const BACKEND_API_URL = 'https://your-api.com/v1';      // Your backend API URL
 **"Could not extract sufficient information"**:
 - The email may not be a job application email
 - Try "Test Parsing" to see what was extracted
-- You can manually add applications via the main TrackMail app
+- You can manually add applications via the main JobMail app
 
 **"API request failed"**:
 - Check that your backend API is running
@@ -215,5 +215,5 @@ To publish the add-on to Google Workspace Marketplace:
 
 ## License
 
-Part of the TrackMail project. See main project README for license information.
+Part of the JobMail project. See main project README for license information.
 

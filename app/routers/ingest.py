@@ -189,7 +189,7 @@ async def ingest_email(
             application_id=None,
             message=(
                 "This email does not appear to be a job application email. "
-                "TrackMail only tracks emails related to job applications, interviews, offers, and rejections. "
+                "JobMail only tracks emails related to job applications, interviews, offers, and rejections. "
                 "If you believe this is an error, please contact support."
             ),
             duplicate=False,

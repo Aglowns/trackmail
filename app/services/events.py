@@ -1,5 +1,5 @@
 """
-Event Service for TrackMail
+Event Service for JobMail
 Handles application event tracking and management
 """
 from typing import List, Optional, Dict, Any

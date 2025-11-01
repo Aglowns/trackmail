@@ -1,6 +1,6 @@
 """
-TrackMail Backend Application
+JobMail Backend Application
 
-This package contains the FastAPI application for the TrackMail job application tracker.
+This package contains the FastAPI application for the JobMail job application tracker.
 """
 

@@ -13,18 +13,18 @@
  */
 
 // Configuration
-const FRONTEND_LOGIN_URL = 'https://trackmail-frontend.vercel.app/login'; // Frontend login page
-const BACKEND_API_URL = 'https://trackmail-backend1.onrender.com/v1'; // Deployed Backend API URL (Render)
+const FRONTEND_LOGIN_URL = 'https://jobmail-frontend.vercel.app/login'; // Frontend login page
+const BACKEND_API_URL = 'https://jobmail-backend1.onrender.com/v1'; // Deployed Backend API URL (Render)
 const SUPABASE_URL = 'https://vhbnxzhvbawaqrgcddo6.supabase.co'; // Your Supabase project URL
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoYm54emh2YmF3YXFyZ2NkZG82Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxODQ1MzQsImV4cCI6MjA2MTc2MDUzNH0.JV5XHlMaBn3xqXBPnZOiwn7oqlCBMQaUiH4dVEjlKbQ'; // Your Supabase anon key
 
 // Storage keys
-const SESSION_HANDLE_KEY = 'trackmail_session_handle';
-const CACHED_TOKEN_KEY = 'trackmail_cached_token';
-const CACHED_TOKEN_EXPIRES_KEY = 'trackmail_token_expires';
-const REFRESH_TOKEN_KEY = 'trackmail_refresh_token';
-const INSTALLATION_TOKEN_KEY = 'trackmail_installation_token';
-const USER_EMAIL_KEY = 'trackmail_user_email';
+const SESSION_HANDLE_KEY = 'jobmail_session_handle';
+const CACHED_TOKEN_KEY = 'jobmail_cached_token';
+const CACHED_TOKEN_EXPIRES_KEY = 'jobmail_token_expires';
+const REFRESH_TOKEN_KEY = 'jobmail_refresh_token';
+const INSTALLATION_TOKEN_KEY = 'jobmail_installation_token';
+const USER_EMAIL_KEY = 'jobmail_user_email';
 
 /**
  * Get the frontend login URL where users can sign in.

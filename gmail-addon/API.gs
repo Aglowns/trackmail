@@ -1,7 +1,7 @@
 /**
  * Backend API Communication
  * 
- * This file contains functions for communicating with the TrackMail backend API.
+ * This file contains functions for communicating with the JobMail backend API.
  * All API calls use authentication via the Auth Bridge.
  */
 

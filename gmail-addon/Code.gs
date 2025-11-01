@@ -1,5 +1,5 @@
 /**
- * TrackMail Gmail Add-on
+ * JobMail Gmail Add-on
  * 
  * Main entry points and trigger functions for the Gmail Add-on.
  * This file contains the core functions that Gmail calls when the add-on is activated.
@@ -75,12 +75,12 @@ function onGmailMessageOpen(e) {
 function onGmailCompose(e) {
   // We don't use compose actions, but this is required by Gmail
   return CardService.newCardBuilder()
-    .setHeader(CardService.newCardHeader().setTitle('TrackMail'))
+    .setHeader(CardService.newCardHeader().setTitle('JobMail'))
     .addSection(
       CardService.newCardSection()
         .addWidget(
           CardService.newTextParagraph()
-            .setText('TrackMail works with received emails. Open an email to track it as a job application.')
+            .setText('JobMail works with received emails. Open an email to track it as a job application.')
         )
     )
     .build();
@@ -186,7 +186,7 @@ function trackApplicationAction(e) {
               CardService.newCardBuilder()
                 .setHeader(
                   CardService.newCardHeader()
-                    .setTitle('📧 TrackMail')
+                    .setTitle('📧 JobMail')
                     .setSubtitle('Not Job Related')
                 )
                 .addSection(
@@ -230,7 +230,7 @@ function trackApplicationAction(e) {
               CardService.newCardBuilder()
                 .setHeader(
                   CardService.newCardHeader()
-                    .setTitle('📧 TrackMail')
+                    .setTitle('📧 JobMail')
                     .setSubtitle('Already Tracked')
                 )
                 .addSection(
@@ -306,7 +306,7 @@ function trackApplicationAction(e) {
               CardService.newCardBuilder()
                 .setHeader(
                   CardService.newCardHeader()
-                    .setTitle('📧 TrackMail')
+                    .setTitle('📧 JobMail')
                     .setSubtitle('Not a Job Application')
                 )
                 .addSection(
@@ -368,7 +368,7 @@ function trackApplicationAction(e) {
             CardService.newCardBuilder()
               .setHeader(
                 CardService.newCardHeader()
-                  .setTitle('📧 TrackMail')
+                  .setTitle('📧 JobMail')
                   .setSubtitle('Error Details')
               )
               .addSection(
@@ -425,7 +425,7 @@ function trackApplicationAction(e) {
             CardService.newCardBuilder()
               .setHeader(
                 CardService.newCardHeader()
-                  .setTitle('📧 TrackMail')
+                  .setTitle('📧 JobMail')
                   .setSubtitle('Error')
               )
               .addSection(
@@ -525,7 +525,7 @@ function testParsingAction(e) {
             CardService.newCardBuilder()
               .setHeader(
                 CardService.newCardHeader()
-                  .setTitle('📧 TrackMail')
+                  .setTitle('📧 JobMail')
                   .setSubtitle('Test Error')
               )
               .addSection(
@@ -739,18 +739,18 @@ function openTokenPageAction(e) {
     return CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
-          .setTitle('📧 TrackMail')
+          .setTitle('📧 JobMail')
           .setSubtitle('Sign In Required')
       )
       .addSection(
         CardService.newCardSection()
           .addWidget(
             CardService.newTextParagraph()
-              .setText('<b>👋 Welcome to TrackMail!</b>')
+              .setText('<b>👋 Welcome to JobMail!</b>')
           )
           .addWidget(
             CardService.newTextParagraph()
-              .setText('To get started, you need to sign in with your Gmail account on the TrackMail website.')
+              .setText('To get started, you need to sign in with your Gmail account on the JobMail website.')
           )
       )
       .addSection(
@@ -758,7 +758,7 @@ function openTokenPageAction(e) {
           .setHeader('Setup Steps:')
           .addWidget(
             CardService.newTextParagraph()
-              .setText('<b>1.</b> Click "Open TrackMail" below<br>' +
+              .setText('<b>1.</b> Click "Open JobMail" below<br>' +
                        '<b>2.</b> Sign in with <b>this Gmail account</b> (' + Session.getActiveUser().getEmail() + ')<br>' +
                        '<b>3.</b> Come back here and click "I\'ve Signed In"')
           )
@@ -767,7 +767,7 @@ function openTokenPageAction(e) {
         CardService.newCardSection()
           .addWidget(
             CardService.newTextButton()
-              .setText('🌐 Open TrackMail')
+              .setText('🌐 Open JobMail')
               .setBackgroundColor('#667eea')
               .setOpenLink(
                 CardService.newOpenLink()
@@ -828,7 +828,7 @@ function checkAuthenticationAction(e) {
     return CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
-          .setTitle('📧 TrackMail')
+          .setTitle('📧 JobMail')
           .setSubtitle('Connect Your Account')
       )
       .addSection(
@@ -839,7 +839,7 @@ function checkAuthenticationAction(e) {
           )
           .addWidget(
             CardService.newTextParagraph()
-              .setText('Get your connection token from the TrackMail website. <b>You only need to do this once!</b>')
+              .setText('Get your connection token from the JobMail website. <b>You only need to do this once!</b>')
           )
       )
       .addSection(
@@ -915,7 +915,7 @@ function showTokenInputCard(e) {
     return CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
-          .setTitle('📧 TrackMail')
+          .setTitle('📧 JobMail')
           .setSubtitle('Paste Your Token')
       )
       .addSection(
@@ -1049,7 +1049,7 @@ function saveTokenAndConnect(e) {
           CardService.newCardBuilder()
             .setHeader(
               CardService.newCardHeader()
-                .setTitle('📧 TrackMail')
+                .setTitle('📧 JobMail')
                 .setSubtitle('Connected!')
             )
             .addSection(
@@ -1060,7 +1060,7 @@ function saveTokenAndConnect(e) {
                 )
                 .addWidget(
                   CardService.newTextParagraph()
-                    .setText('<font color="#16a34a">Your Gmail add-on is now connected to your TrackMail account.</font>')
+                    .setText('<font color="#16a34a">Your Gmail add-on is now connected to your JobMail account.</font>')
                 )
             )
             .addSection(
@@ -1070,7 +1070,7 @@ function saveTokenAndConnect(e) {
                   CardService.newTextParagraph()
                     .setText('• Open any job application email<br>' +
                              '• Click "Track This Application"<br>' +
-                             '• Your applications will automatically sync to TrackMail<br><br>' +
+                             '• Your applications will automatically sync to JobMail<br><br>' +
                              '<b>Signed in as:</b> ' + userEmail)
                 )
             )

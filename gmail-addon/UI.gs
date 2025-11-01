@@ -14,14 +14,14 @@ function buildSignInCard() {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Track job applications from Gmail')
     )
     .addSection(
       CardService.newCardSection()
         .addWidget(
           CardService.newTextParagraph()
-            .setText('<b>Welcome to TrackMail!</b><br><br>Automatically track job application emails and manage your job search from Gmail.')
+            .setText('<b>Welcome to JobMail!</b><br><br>Automatically track job application emails and manage your job search from Gmail.')
         )
         .addWidget(
           CardService.newTextParagraph()
@@ -41,7 +41,7 @@ function buildSignInCard() {
         )
         .addWidget(
           CardService.newTextParagraph()
-            .setText('<font color="#6b7280"><i>TrackMail will connect automatically and start working with your Gmail.</i></font>')
+            .setText('<font color="#6b7280"><i>JobMail will connect automatically and start working with your Gmail.</i></font>')
         )
     )
     .build();
@@ -240,7 +240,7 @@ function buildTrackingCard(messageId, accessToken) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Signed in as: ' + userEmail)
     )
     .addSection(
@@ -295,7 +295,7 @@ function buildSuccessCard(result) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Success!')
     )
     .addSection(
@@ -339,7 +339,7 @@ function buildErrorCard(errorMessage) {
   
   if (errorMessage.includes('Authentication') || errorMessage.includes('sign in')) {
     errorType = 'Authentication Error';
-    guidanceText = 'Please sign in again to continue using TrackMail.';
+    guidanceText = 'Please sign in again to continue using JobMail.';
   } else if (errorMessage.includes('Backend service unavailable') || errorMessage.includes('502')) {
     errorType = 'Service Unavailable';
     guidanceText = 'Our servers are temporarily unavailable. Please try again in a few minutes.';
@@ -364,7 +364,7 @@ function buildErrorCard(errorMessage) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle(errorType)
     )
     .addSection(
@@ -471,7 +471,7 @@ function buildTestResultsCard(result) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Test Results')
     )
     .addSection(
@@ -515,7 +515,7 @@ function buildAuthSuccessCard() {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Authentication Successful')
     )
     .addSection(
@@ -562,7 +562,7 @@ function buildSettingsCard(userEmail) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Settings')
     )
     .addSection(
@@ -590,7 +590,7 @@ function buildSettingsCard(userEmail) {
       CardService.newCardSection()
         .addWidget(
           CardService.newTextParagraph()
-            .setText('<font color="#6b7280"><i>TrackMail helps you manage job applications directly from Gmail. Open any email to track it as a job application.</i></font>')
+            .setText('<font color="#6b7280"><i>JobMail helps you manage job applications directly from Gmail. Open any email to track it as a job application.</i></font>')
         )
     )
     .build();
@@ -608,7 +608,7 @@ function buildLoadingCard(message) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Processing...')
     )
     .addSection(
@@ -663,7 +663,7 @@ function buildApplicationDetailsCard(application) {
   const card = CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('📧 TrackMail')
+        .setTitle('📧 JobMail')
         .setSubtitle('Application Details')
     )
     .addSection(section)
