@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.deps import CurrentUserId
 from app.schemas import EmailIngest, IngestResponse, ApplicationCreate
-from app.services.parsing import parse_job_application_email
+from app.services.parsing import EmailParser, parse_job_application_email
 from app.services.emails import (
     store_email_message,
     generate_email_hash,
@@ -173,7 +173,30 @@ async def ingest_email(
             duplicate=True,
         )
     
-    # Step 2: Parse email to extract application details
+    # Step 2: Check if email is actually job-related BEFORE parsing
+    print(f"🔍 Checking if email is job-related...")
+    parser = EmailParser()
+    is_job_email = parser._is_job_application(email_data)
+    print(f"🔍 Job application check result: {is_job_email}")
+    
+    if not is_job_email:
+        # Email is NOT job-related - don't track it
+        print(f"❌ Email is NOT a job application. Subject: '{email_data.subject}'")
+        print(f"❌ Sender: '{email_data.sender}'")
+        return IngestResponse(
+            success=False,
+            application_id=None,
+            message=(
+                "This email does not appear to be a job application email. "
+                "TrackMail only tracks emails related to job applications, interviews, offers, and rejections. "
+                "If you believe this is an error, please contact support."
+            ),
+            duplicate=False,
+        )
+    
+    print(f"✅ Email is job-related, proceeding with parsing...")
+    
+    # Step 3: Parse email to extract application details
     print(f"Email data received: {email_data}")
     print(f"Detected status: {getattr(email_data, 'detected_status', 'NOT_SET')}")
     print(f"Parsed status: {getattr(email_data, 'parsed_status', 'NOT_SET')}")
@@ -210,7 +233,7 @@ async def ingest_email(
             duplicate=False,
         )
     
-    # Step 4: Create application
+    # Step 5: Create application
     try:
         # Map all status variations to the simplified statuses we actually use
         # This ensures old/different status names are normalized correctly

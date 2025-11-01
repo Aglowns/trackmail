@@ -12,7 +12,7 @@ Parsing strategies:
 1. Pattern matching (regex) for common email formats
 2. Heuristics based on sender domain and subject patterns
 3. Keyword extraction
-4. (Future) LLM-based extraction for complex emails
+4. AI-powered detection using OpenAI GPT (for job application classification)
 
 Educational Note:
 This is a simplified parser for MVP. In production, you'd want:
@@ -22,9 +22,13 @@ This is a simplified parser for MVP. In production, you'd want:
 - Training data from user corrections
 """
 
+import json
 import re
 from typing import Optional, Dict, Any
 
+import httpx
+
+from app.config import settings
 from app.schemas import EmailIngest
 
 
@@ -92,16 +96,163 @@ class EmailParser:
             }
     
     def _is_job_application(self, email_data) -> bool:
-        """Determine if email is related to job applications"""
+        """
+        Determine if email is related to job applications using AI (if available) or fallback keywords.
+        
+        This is a smart detector that uses OpenAI GPT to understand context and meaning,
+        not just keyword matching. This prevents false positives like trading emails.
+        """
+        # Try AI-based detection first (more accurate)
+        if settings.openai_api_key:
+            try:
+                ai_result = detect_job_application_with_ai(
+                    subject=email_data.subject,
+                    sender=email_data.sender,
+                    body=email_data.text_body or ""
+                )
+                if ai_result is not None:
+                    return ai_result.get("is_job_application", False)
+            except Exception as e:
+                print(f"⚠️ AI detection failed, falling back to keyword matching: {e}")
+        
+        # Fallback to keyword-based detection
         content = (email_data.subject + " " + (email_data.text_body or "")).lower()
         
+        # More specific keywords to reduce false positives
         job_keywords = [
-            'application', 'interview', 'job', 'position', 'career',
-            'hiring', 'recruit', 'candidate', 'resume', 'cv',
-            'offer', 'employment', 'role', 'opportunity'
+            'job application', 'application received', 'thank you for applying',
+            'interview', 'job offer', 'position', 'career opportunity',
+            'hiring', 'recruiter', 'candidate', 'resume', 'cv',
+            'employment', 'role', 'we received your application',
+            'next steps', 'schedule interview', 'application status'
         ]
         
-        return any(keyword in content for keyword in job_keywords)
+        # Also check for rejection keywords to ensure we catch rejections
+        rejection_keywords = [
+            'not selected', 'decided to go with another candidate',
+            'unfortunately', 'not moving forward', 'not the right fit'
+        ]
+        
+        has_job_keywords = any(keyword in content for keyword in job_keywords)
+        has_rejection_keywords = any(keyword in content for keyword in rejection_keywords)
+        
+        return has_job_keywords or has_rejection_keywords
+
+
+def detect_job_application_with_ai(subject: str, sender: str, body: str) -> Optional[Dict[str, Any]]:
+    """
+    Use OpenAI GPT to intelligently determine if an email is a job application email.
+    
+    This function uses common sense AI reasoning to distinguish between:
+    - Job application emails (application confirmations, interview invites, offers, rejections)
+    - Non-job emails (marketing, newsletters, trading, personal, etc.)
+    
+    Args:
+        subject: Email subject line
+        sender: Email sender address
+        body: Email body content (plain text)
+        
+    Returns:
+        Dictionary with:
+        - is_job_application: bool (True if email is job-related)
+        - confidence: float (0.0-1.0)
+        - reasoning: str (brief explanation)
+        Or None if API call fails
+    """
+    if not settings.openai_api_key:
+        return None
+    
+    # Truncate body if too long (OpenAI has token limits)
+    max_body_length = 2000
+    truncated_body = body[:max_body_length] if len(body) > max_body_length else body
+    
+    prompt = f"""You are an expert email classifier. Analyze this email and determine if it is related to a JOB APPLICATION.
+
+CRITICAL: Use common sense! Many emails mention words like "opportunity" or "offer" but are NOT job applications.
+
+Job application emails include:
+- Application confirmations ("thank you for applying", "application received")
+- Interview invitations ("we'd like to schedule", "interview", "next steps")
+- Status updates ("your application", "candidate", "position")
+- Job offers ("we are pleased to offer", "congratulations", "offer letter")
+- Rejections ("unfortunately", "not selected", "decided to go with another candidate")
+- Withdrawals ("application withdrawn")
+
+NOT job application emails:
+- Marketing/promotional emails (trading, investments, sales, deals)
+- Newsletters, updates, notifications
+- Personal emails
+- Spam
+- Financial/trading opportunities
+- Course offers, educational content
+- Product announcements
+
+Email Subject: {subject}
+From: {sender}
+Content:
+{truncated_body}
+
+Analyze this email and respond with ONLY a valid JSON object:
+{{
+  "is_job_application": true or false,
+  "confidence": number between 0.0 and 1.0,
+  "reasoning": "brief explanation of your decision"
+}}"""
+
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            response = client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.openai_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "gpt-3.5-turbo",
+                    "messages": [
+                        {
+                            "role": "system",
+                            "content": "You are an expert email classifier. Always respond with valid JSON only, no other text."
+                        },
+                        {
+                            "role": "user",
+                            "content": prompt
+                        }
+                    ],
+                    "max_tokens": 200,
+                    "temperature": 0.1,  # Low temperature for consistent, factual responses
+                },
+            )
+            
+            if response.status_code != 200:
+                print(f"⚠️ OpenAI API error: {response.status_code} - {response.text}")
+                return None
+            
+            response_data = response.json()
+            ai_content = response_data["choices"][0]["message"]["content"]
+            
+            # Parse JSON response (may be wrapped in markdown code blocks)
+            ai_content = ai_content.strip()
+            if ai_content.startswith("```"):
+                # Remove markdown code block markers
+                ai_content = ai_content.split("```")[1]
+                if ai_content.startswith("json"):
+                    ai_content = ai_content[4:]
+                ai_content = ai_content.strip()
+            
+            result = json.loads(ai_content)
+            
+            print(f"✅ AI Job Detection: is_job={result.get('is_job_application')}, "
+                  f"confidence={result.get('confidence')}, reasoning={result.get('reasoning')}")
+            
+            return result
+            
+    except json.JSONDecodeError as e:
+        print(f"⚠️ Failed to parse AI response as JSON: {e}")
+        return None
+    except Exception as e:
+        print(f"⚠️ AI detection failed: {e}")
+        return None
 
 
 def extract_company_from_sender(sender: str) -> Optional[str]:

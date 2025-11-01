@@ -25,7 +25,8 @@ function ingestEmail(emailData) {
     
     // Ensure response has proper structure
     if (response && typeof response === 'object') {
-      // If response doesn't have success property, add it
+      // Preserve the success property if it exists (may be false for non-job emails)
+      // Only default to true if success is undefined
       if (response.success === undefined) {
         response.success = true;
       }

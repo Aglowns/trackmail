@@ -236,6 +236,59 @@ function trackApplicationAction(e) {
       console.log('Full result object:', JSON.stringify(result, null, 2));
       
       const errorMessage = result ? (result.message || result.error || 'Failed to track application') : 'No response from server';
+      
+      // Check if this is a "not a job email" error
+      const isNotJobEmail = errorMessage && (
+        errorMessage.includes('does not appear to be a job application') ||
+        errorMessage.includes('not a job application') ||
+        errorMessage.includes('only tracks emails related to job applications')
+      );
+      
+      // Show different card for non-job emails
+      if (isNotJobEmail) {
+        return CardService.newActionResponseBuilder()
+          .setNavigation(
+            CardService.newNavigation().updateCard(
+              CardService.newCardBuilder()
+                .setHeader(
+                  CardService.newCardHeader()
+                    .setTitle('📧 TrackMail')
+                    .setSubtitle('Not a Job Application')
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newDecoratedText()
+                        .setTopLabel('⚠️')
+                        .setText('This email is not a job application email')
+                        .setWrapText(true)
+                    )
+                    .addWidget(
+                      CardService.newTextParagraph()
+                        .setText(
+                          '<font color="#6b7280">' + errorMessage + '</font>'
+                        )
+                    )
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newTextButton()
+                        .setText('← Back')
+                        .setBackgroundColor('#6366f1')
+                        .setOnClickAction(
+                          CardService.newAction()
+                            .setFunctionName('onGmailMessageOpen')
+                        )
+                    )
+                  )
+                .build()
+            )
+          )
+          .build();
+      }
+      
+      // Regular error handling for other errors
       const detailsLines = [];
       
       // Extract all useful diagnostic information

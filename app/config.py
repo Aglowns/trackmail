@@ -79,6 +79,12 @@ class Settings(BaseSettings):
         description="Allowed CORS origins (comma-separated in .env)"
     )
     
+    # OpenAI Configuration
+    openai_api_key: str | None = Field(
+        default=None,
+        description="OpenAI API key for AI-powered email classification and parsing (optional)"
+    )
+    
     # Pydantic Settings configuration
     model_config = SettingsConfigDict(
         # Load from .env file
