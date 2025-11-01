@@ -212,27 +212,43 @@ async def ingest_email(
     
     # Step 4: Create application
     try:
-        # Sanitize/normalize status to match backend enum
-        allowed_statuses = {
-            "wishlist", "applied", "screening", "interviewing", "interview_scheduled",
-            "interview_completed", "offer", "offer_received", "rejected", "accepted", "withdrawn"
-        }
+        # Map all status variations to the simplified statuses we actually use
+        # This ensures old/different status names are normalized correctly
         status_map = {
-            # common variants
+            # Rejection variants
             "reject": "rejected",
             "rejection": "rejected",
             "declined": "rejected",
             "decline": "rejected",
-            "offer received": "offer_received",
-            "offer_received": "offer_received",
-            "offeraccepted": "accepted",
-            "accepted offer": "accepted",
+            # Interview variants → interviewing
             "interview": "interviewing",
             "interviews": "interviewing",
-            "screen": "screening",
+            "interview_scheduled": "interviewing",
+            "interview_completed": "interviewing",
+            "screening": "interviewing",
+            "screen": "interviewing",
+            # Offer variants → offer
+            "offer received": "offer",
+            "offer_received": "offer",
+            "offeraccepted": "offer",
+            "accepted offer": "offer",
+            "accepted": "offer",
+            # Keep these as-is (already simplified)
+            "applied": "applied",
+            "interviewing": "interviewing",
+            "offer": "offer",
+            "rejected": "rejected",
+            "withdrawn": "withdrawn",
+            "wishlist": "applied",  # Map wishlist to applied for simplicity
         }
+        
+        # Only allow the simplified statuses that match our database enum
+        allowed_statuses = {"applied", "interviewing", "offer", "rejected", "withdrawn"}
+        
         raw_status = (parsed.get("status") or "").strip().lower()
-        normalized_status = status_map.get(raw_status, raw_status)
+        normalized_status = status_map.get(raw_status, "applied")  # Default to "applied" if unknown
+        
+        # Final validation: ensure it's in allowed list (should always pass after mapping)
         if normalized_status not in allowed_statuses:
             normalized_status = "applied"
 

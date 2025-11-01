@@ -120,67 +120,86 @@ function clearSessionHandle() {
 /**
  * Get a valid access token (JWT from Supabase).
  * 
- * This function checks if we have a cached token that's still valid.
- * If expired, it automatically refreshes using the refresh token.
+ * PRIORITY ORDER:
+ * 1. Installation token (365-day long-lived) - ALWAYS USE THIS FIRST if available
+ * 2. Cached short-lived access token (if still valid)
+ * 3. Refresh short-lived token using refresh token (if available)
+ * 4. Return null (user needs to re-authenticate)
  * 
  * @return {string|null} Access token or null if authentication fails
  */
 function getAccessToken() {
   const userProperties = PropertiesService.getUserProperties();
-  const cachedToken = userProperties.getProperty(CACHED_TOKEN_KEY);
-  const expiresAt = userProperties.getProperty(CACHED_TOKEN_EXPIRES_KEY);
-
-  if (cachedToken && expiresAt) {
-    const now = Date.now();
-    if (now < parseInt(expiresAt, 10)) {
-      console.log('Using cached token (valid)');
-      return cachedToken;
-    }
-
-    console.log('Cached token expired - attempting refresh');
-    const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
-    if (refreshToken && refreshToken.length > 20) {
-      console.log('Attempting to refresh using stored refresh token...');
-      const newToken = refreshAccessToken(refreshToken);
-      if (newToken) {
-        console.log('Token refreshed successfully');
-        return newToken;
-      }
-    } else {
-      console.log('No valid refresh token available - falling back to installation token');
-    }
-
-    userProperties.deleteProperty(CACHED_TOKEN_KEY);
-    userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
-  }
-
+  
+  // PRIORITY 1: Check for installation token first (long-lived, designed to last 365 days)
   const installationToken = userProperties.getProperty(INSTALLATION_TOKEN_KEY);
   if (installationToken) {
     const payload = decodeJwtPayload(installationToken) || {};
     const exp = payload.exp ? payload.exp * 1000 : null;
     const now = Date.now();
 
-    if (!exp || now < exp - 300000) {
-      console.log('Using installation token for authentication');
+    // Installation token is valid if:
+    // - It has an exp claim AND it's not expired (with 1 day buffer for safety)
+    // - OR it has no exp claim (assume it's valid - installation tokens shouldn't expire quickly)
+    const isValid = !exp || now < exp - (24 * 60 * 60 * 1000); // 1 day buffer before actual expiry
 
-      userProperties.setProperty(CACHED_TOKEN_KEY, installationToken);
-      if (exp) {
-        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (exp - 300000).toString());
-      } else {
-        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (now + 6 * 60 * 60 * 1000).toString());
-      }
-
+    if (isValid) {
+      console.log('✅ Using installation token (long-lived, 365-day validity)');
+      
+      // Cache user email if available
       if (payload.email) {
         userProperties.setProperty(USER_EMAIL_KEY, payload.email);
       }
-
+      
+      // Always return installation token - it's designed to work for a full year
       return installationToken;
+    } else {
+      console.warn('⚠️ Installation token has expired (after 365 days). User needs to get a new one from Settings.');
+      // Don't delete it - user might want to see the error and get a new one
     }
-
-    console.warn('Installation token appears expired - user must reauthenticate');
   }
 
-  console.log('No valid access token found - authentication required');
+  // PRIORITY 2: Check for cached short-lived access token
+  const cachedToken = userProperties.getProperty(CACHED_TOKEN_KEY);
+  const expiresAt = userProperties.getProperty(CACHED_TOKEN_EXPIRES_KEY);
+
+  if (cachedToken && expiresAt) {
+    const now = Date.now();
+    if (now < parseInt(expiresAt, 10)) {
+      console.log('✅ Using cached short-lived access token (still valid)');
+      return cachedToken;
+    }
+
+    // Cached token expired - try to refresh
+    console.log('Cached token expired - attempting refresh');
+    const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
+    if (refreshToken && refreshToken.length > 20) {
+      console.log('Attempting to refresh using stored refresh token...');
+      const newToken = refreshAccessToken(refreshToken);
+      if (newToken) {
+        console.log('✅ Token refreshed successfully');
+        return newToken;
+      }
+    }
+
+    // Clear expired cached token
+    userProperties.deleteProperty(CACHED_TOKEN_KEY);
+    userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+  }
+
+  // PRIORITY 3: Try refresh token directly (if no cached token exists)
+  const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
+  if (refreshToken && refreshToken.length > 20) {
+    console.log('Attempting to get new token using refresh token...');
+    const newToken = refreshAccessToken(refreshToken);
+    if (newToken) {
+      console.log('✅ Got new token via refresh token');
+      return newToken;
+    }
+  }
+
+  // PRIORITY 4: No valid tokens available
+  console.log('❌ No valid access token found - authentication required');
   return null;
 }
 
@@ -234,7 +253,7 @@ function refreshAccessToken(refreshToken) {
     }
     
     // Save the new tokens and user email
-    const userProperties = PropertiesService.getUserProperties();
+  const userProperties = PropertiesService.getUserProperties();
     userProperties.setProperty(CACHED_TOKEN_KEY, data.access_token);
     
     // Update refresh token if a new one is provided
@@ -442,42 +461,46 @@ function makeAuthenticatedRequest(endpoint, options) {
   console.log('Making authenticated request to:', endpoint);
   
   try {
-    // Get access token
+    // Tokens available
     const accessToken = getAccessToken();
-    console.log('Got access token:', accessToken ? 'Yes' : 'No');
+    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    console.log('Token availability — access:', !!accessToken, 'installation:', !!installationToken);
     
-    // Prepare the request
     const url = BACKEND_API_URL + endpoint;
 
-    // Prefer cached short-lived access token; otherwise fall back to installation token
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    // Prefer installation token first (long-lived), then fallback to access token
+    const tokensToTry = [];
+    if (installationToken) tokensToTry.push(installationToken);
+    if (accessToken && accessToken !== installationToken) tokensToTry.push(accessToken);
 
-    const authorizationToken = accessToken || installationToken || '';
-    const requestOptions = {
-      method: options.method || 'GET',
-      headers: {
-        'Authorization': `Bearer ${authorizationToken}`,
-        'Content-Type': 'application/json'
-      },
-      muteHttpExceptions: true
-    };
-    
-    // Add payload if provided
-    if (options.payload) {
-      if (typeof options.payload === 'object') {
-        requestOptions.payload = JSON.stringify(options.payload);
-      } else {
-        requestOptions.payload = options.payload;
+    // Ensure we try at least one (empty string triggers 401 for clearer error path)
+    if (tokensToTry.length === 0) tokensToTry.push('');
+
+    let lastErrorPayload = null;
+    for (let i = 0; i < tokensToTry.length; i++) {
+      const token = tokensToTry[i];
+      const requestOptions = {
+        method: options.method || 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        muteHttpExceptions: true
+      };
+
+      // Add payload if provided
+      if (options.payload) {
+        if (typeof options.payload === 'object') {
+          requestOptions.payload = JSON.stringify(options.payload);
+        } else {
+          requestOptions.payload = options.payload;
+        }
       }
-    }
-    
-    console.log('Making request to:', url);
-    console.log('Request options:', JSON.stringify(requestOptions));
-    
-    // Make the request
-    const response = UrlFetchApp.fetch(url, requestOptions);
-    const responseText = response.getContentText();
-    const statusCode = response.getResponseCode();
+
+      console.log('Making request to:', url, 'with token type:', token && token.startsWith('eyJ') ? 'JWT' : token ? 'other' : 'none');
+      const response = UrlFetchApp.fetch(url, requestOptions);
+      const responseText = response.getContentText();
+      const statusCode = response.getResponseCode();
     
     console.log('Response status:', statusCode);
     console.log('Response body:', responseText);
@@ -513,20 +536,33 @@ function makeAuthenticatedRequest(endpoint, options) {
       };
     }
     
-    if (statusCode >= 200 && statusCode < 300) {
-      return responseData;
-    } else {
-      console.error('API request failed:', statusCode, responseData);
+      if (statusCode >= 200 && statusCode < 300) {
+        return responseData;
+      }
 
-      // Build a compact, serializable error payload so callers can display details
+      // If unauthorized and we have another token to try, continue loop
+      if (statusCode === 401 && i < tokensToTry.length - 1) {
+        console.warn('Request unauthorized with current token. Retrying with fallback token...');
+        lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message, raw: responseText };
+        continue;
+      }
+
+      console.error('API request failed:', statusCode, responseData);
       const payload = {
         status: statusCode,
         message: responseData.error || responseData.message || 'Unknown error',
         raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
       };
-      // Throw a JSON string so callers can parse it
       throw new Error('API_ERROR::' + JSON.stringify(payload));
     }
+
+    // If we exhausted retries, throw last captured 401
+    if (lastErrorPayload) {
+      throw new Error('API_ERROR::' + JSON.stringify(lastErrorPayload));
+    }
+    
+    // Fallback generic error
+    throw new Error('API_ERROR::' + JSON.stringify({ status: 401, message: 'Authentication required' }));
     
   } catch (error) {
     console.error('Error in makeAuthenticatedRequest:', error);
