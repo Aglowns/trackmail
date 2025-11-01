@@ -134,31 +134,42 @@ function getAccessToken() {
   // PRIORITY 1: Check for installation token first (long-lived, designed to last 365 days)
   const installationToken = userProperties.getProperty(INSTALLATION_TOKEN_KEY);
   if (installationToken) {
-    const payload = decodeJwtPayload(installationToken) || {};
-    const exp = payload.exp ? payload.exp * 1000 : null;
-    const now = Date.now();
+    try {
+      const payload = decodeJwtPayload(installationToken) || {};
+      const exp = payload.exp ? payload.exp * 1000 : null;
+      const now = Date.now();
 
-    // Installation token is valid if:
-    // - It has an exp claim AND current time is before expiration (with 5 minute safety buffer)
-    // - OR it has no exp claim (assume it's valid - installation tokens last 365 days)
-    const isValid = !exp || now < (exp - 5 * 60 * 1000); // 5 minute buffer before actual expiry
+      // Installation token is valid if:
+      // - It has an exp claim AND current time is before expiration (with 1 hour safety buffer)
+      // - OR it has no exp claim (assume it's valid - installation tokens last 365 days)
+      const isValid = !exp || now < (exp - 60 * 60 * 1000); // 1 hour buffer before actual expiry
 
-    if (isValid) {
-      console.log('✅ Using installation token (long-lived, 365-day validity)');
-      console.log('Token expires in:', exp ? Math.floor((exp - now) / (1000 * 60 * 60 * 24)) + ' days' : 'N/A');
-      
-      // Cache user email if available
-      if (payload.email) {
-        userProperties.setProperty(USER_EMAIL_KEY, payload.email);
+      if (isValid) {
+        const daysUntilExpiry = exp ? Math.floor((exp - now) / (1000 * 60 * 60 * 24)) : null;
+        console.log('✅ Using installation token (long-lived, 365-day validity)');
+        console.log('Token expires in:', daysUntilExpiry !== null ? daysUntilExpiry + ' days' : 'N/A (no expiry)');
+        console.log('Token type:', payload.type || 'unknown');
+        console.log('Token issued:', payload.iat ? new Date(payload.iat * 1000).toISOString() : 'N/A');
+        
+        // Cache user email if available
+        if (payload.email) {
+          userProperties.setProperty(USER_EMAIL_KEY, payload.email);
+        }
+        
+        // Always return installation token - it's designed to work for a full year
+        return installationToken;
+      } else {
+        const expiredDaysAgo = exp ? Math.floor((now - exp) / (1000 * 60 * 60 * 24)) : 0;
+        console.warn('⚠️ Installation token has expired.');
+        console.warn('Token expired:', new Date(exp).toISOString(), '(' + expiredDaysAgo + ' days ago)');
+        console.warn('Current time:', new Date(now).toISOString());
+        console.warn('⚠️ User needs to get a fresh installation token from Settings page.');
+        // Don't delete it - user might want to see the error and get a new one
       }
-      
-      // Always return installation token - it's designed to work for a full year
-      return installationToken;
-    } else {
-      console.warn('⚠️ Installation token has expired (after 365 days). User needs to get a new one from Settings.');
-      console.warn('Token expired:', new Date(exp).toISOString());
-      console.warn('Current time:', new Date(now).toISOString());
-      // Don't delete it - user might want to see the error and get a new one
+    } catch (decodeError) {
+      console.error('❌ Failed to decode installation token:', decodeError);
+      console.error('⚠️ Installation token may be corrupted. User should get a fresh one from Settings.');
+      // Continue to fallback tokens
     }
   }
 
@@ -545,15 +556,21 @@ function makeAuthenticatedRequest(endpoint, options) {
 
       // If unauthorized and we have another token to try, continue loop
       if (statusCode === 401 && i < tokensToTry.length - 1) {
-        console.warn('Request unauthorized with current token. Retrying with fallback token...');
-        lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message, raw: responseText };
+        const tokenType = i === 0 ? 'installation token' : 'access token';
+        console.warn('⚠️ Request unauthorized with ' + tokenType + '. Retrying with fallback token...');
+        console.warn('Response detail:', responseData.detail || responseData.message);
+        lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message || responseData.detail, raw: responseText };
         continue;
       }
 
-      console.error('API request failed:', statusCode, responseData);
+      // Log detailed error info for debugging
+      console.error('❌ API request failed:', statusCode);
+      console.error('Error message:', responseData.error || responseData.message || responseData.detail);
+      console.error('Token tried:', i === 0 ? 'installation token' : 'access token');
+      
       const payload = {
         status: statusCode,
-        message: responseData.error || responseData.message || 'Unknown error',
+        message: responseData.error || responseData.message || responseData.detail || 'Unknown error',
         raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
       };
       throw new Error('API_ERROR::' + JSON.stringify(payload));
