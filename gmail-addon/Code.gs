@@ -221,7 +221,61 @@ function trackApplicationAction(e) {
     
     // Check if result is valid and has success property
     if (result && result.success === true) {
-      // Show success card
+      // Check if this is a duplicate (already tracked)
+      if (result.duplicate === true) {
+        console.log('Duplicate application detected - showing already tracked message');
+        return CardService.newActionResponseBuilder()
+          .setNavigation(
+            CardService.newNavigation().updateCard(
+              CardService.newCardBuilder()
+                .setHeader(
+                  CardService.newCardHeader()
+                    .setTitle('📧 TrackMail')
+                    .setSubtitle('Already Tracked')
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newDecoratedText()
+                        .setTopLabel('✓')
+                        .setText('This application has already been tracked')
+                        .setWrapText(true)
+                    )
+                    .addWidget(
+                      CardService.newTextParagraph()
+                        .setText(
+                          '<font color="#6b7280">' + 
+                          (result.message || 'This email has already been processed and linked to an existing application.') + 
+                          '</font>'
+                        )
+                    )
+                    .addWidget(
+                      CardService.newTextParagraph()
+                        .setText(
+                          '<font color="#10b981"><b>✓ No action needed</b></font><br>' +
+                          '<font color="#6b7280">The application is already in your dashboard.</font>'
+                        )
+                    )
+                )
+                .addSection(
+                  CardService.newCardSection()
+                    .addWidget(
+                      CardService.newTextButton()
+                        .setText('← Back')
+                        .setBackgroundColor('#6366f1')
+                        .setOnClickAction(
+                          CardService.newAction()
+                            .setFunctionName('onGmailMessageOpen')
+                        )
+                    )
+                  )
+                .build()
+            )
+          )
+          .build();
+      }
+      
+      // Show success card for new applications
       console.log('Showing success card');
       return CardService.newActionResponseBuilder()
         .setNavigation(
@@ -944,16 +998,32 @@ function saveTokenAndConnect(e) {
       const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
 
       const userProperties = PropertiesService.getUserProperties();
+      // Save installation token (365-day long-lived token)
       userProperties.setProperty(INSTALLATION_TOKEN_KEY, token);
       userProperties.setProperty(SESSION_HANDLE_KEY, token);
-      userProperties.setProperty(CACHED_TOKEN_KEY, token);
       userProperties.setProperty(USER_EMAIL_KEY, userEmail);
 
-      const expiresAt = payload.exp ? (payload.exp * 1000) : new Date().getTime() + (expiresIn * 1000);
-      userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (expiresAt - 300000).toString());
+      // For installation tokens (365-day tokens), DO NOT set CACHED_TOKEN_EXPIRES_KEY
+      // The installation token will be validated by checking its JWT exp claim directly
+      // Only set expiry if it's a short-lived token (less than 24 hours)
+      const tokenExpiryMs = payload.exp ? (payload.exp * 1000) : (new Date().getTime() + (expiresIn * 1000));
+      const daysUntilExpiry = (tokenExpiryMs - Date.now()) / (1000 * 60 * 60 * 24);
+      
+      if (daysUntilExpiry < 1) {
+        // Short-lived token (less than 24 hours) - set expiry cache
+        userProperties.setProperty(CACHED_TOKEN_KEY, token);
+        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (tokenExpiryMs - 300000).toString());
+        console.log('Short-lived token cached, expires in:', Math.floor(expiresIn / 60), 'minutes');
+      } else {
+        // Long-lived token (installation token) - don't cache with expiry, it will be checked via JWT
+        console.log('✅ Installation token saved (365-day validity)');
+        console.log('Token expires in:', Math.floor(daysUntilExpiry), 'days');
+        // Clear any old cached token expiry
+        userProperties.deleteProperty(CACHED_TOKEN_KEY);
+        userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+      }
 
       console.log('Access token saved successfully for user:', userEmail);
-      console.log('Token expires in:', Math.floor(expiresIn / 60), 'minutes');
 
       const refreshToken = payload.refresh_token || null;
       if (refreshToken) {

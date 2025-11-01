@@ -139,12 +139,13 @@ function getAccessToken() {
     const now = Date.now();
 
     // Installation token is valid if:
-    // - It has an exp claim AND it's not expired (with 1 day buffer for safety)
-    // - OR it has no exp claim (assume it's valid - installation tokens shouldn't expire quickly)
-    const isValid = !exp || now < exp - (24 * 60 * 60 * 1000); // 1 day buffer before actual expiry
+    // - It has an exp claim AND current time is before expiration (with 5 minute safety buffer)
+    // - OR it has no exp claim (assume it's valid - installation tokens last 365 days)
+    const isValid = !exp || now < (exp - 5 * 60 * 1000); // 5 minute buffer before actual expiry
 
     if (isValid) {
       console.log('✅ Using installation token (long-lived, 365-day validity)');
+      console.log('Token expires in:', exp ? Math.floor((exp - now) / (1000 * 60 * 60 * 24)) + ' days' : 'N/A');
       
       // Cache user email if available
       if (payload.email) {
@@ -155,6 +156,8 @@ function getAccessToken() {
       return installationToken;
     } else {
       console.warn('⚠️ Installation token has expired (after 365 days). User needs to get a new one from Settings.');
+      console.warn('Token expired:', new Date(exp).toISOString());
+      console.warn('Current time:', new Date(now).toISOString());
       // Don't delete it - user might want to see the error and get a new one
     }
   }

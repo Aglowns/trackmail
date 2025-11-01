@@ -23,6 +23,7 @@ from app.services.emails import (
 )
 from app.services.applications import create_application
 from app.services import profiles as profile_service
+from app.db import get_supabase_client
 
 # Create router for email ingestion endpoints
 router = APIRouter(prefix="/ingest", tags=["Email Ingestion"])
@@ -233,7 +234,45 @@ async def ingest_email(
             duplicate=False,
         )
     
-    # Step 5: Create application
+    # Step 5: Check for existing application with same company + position (prevent duplicates)
+    company_name = parsed.get("company")
+    position_name = parsed.get("position")
+    
+    if company_name and position_name:
+        print(f"🔍 Checking for existing application: {company_name} - {position_name}")
+        # Get all user's applications to check for duplicates
+        try:
+            from app.routers.applications import list_applications as get_user_applications
+            from app.deps import CurrentUserId
+            
+            # Simple query to check for duplicate by company + position
+            supabase = get_supabase_client()
+            existing_apps = (
+                supabase.table("applications")
+                .select("id, company, position, status")
+                .eq("user_id", user_id)
+                .eq("company", company_name)
+                .eq("position", position_name)
+                .execute()
+            )
+            
+            if existing_apps.data and len(existing_apps.data) > 0:
+                existing_app = existing_apps.data[0]
+                print(f"🔄 Duplicate application found: {existing_app['id']}")
+                print(f"🔄 Existing application status: {existing_app.get('status')}")
+                
+                # Return duplicate response - application already exists
+                return IngestResponse(
+                    success=True,
+                    application_id=existing_app["id"],
+                    message=f"This application has already been tracked. Company: {company_name}, Position: {position_name}",
+                    duplicate=True,
+                )
+        except Exception as dup_check_error:
+            print(f"⚠️ Error checking for duplicate application: {dup_check_error}")
+            # Continue with creation if duplicate check fails
+    
+    # Step 6: Create application
     try:
         # Map all status variations to the simplified statuses we actually use
         # This ensures old/different status names are normalized correctly
