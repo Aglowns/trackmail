@@ -501,17 +501,22 @@ function makeAuthenticatedRequest(endpoint, options) {
     
     const url = BACKEND_API_URL + endpoint;
 
+    const userProperties = PropertiesService.getUserProperties();
+    
     // Prefer installation token first (long-lived), then fallback to access token
     const tokensToTry = [];
-    if (installationToken) tokensToTry.push(installationToken);
-    if (accessToken && accessToken !== installationToken) tokensToTry.push(accessToken);
+    if (installationToken) tokensToTry.push({token: installationToken, type: 'installation'});
+    if (accessToken && accessToken !== installationToken) tokensToTry.push({token: accessToken, type: 'access'});
 
     // Ensure we try at least one (empty string triggers 401 for clearer error path)
-    if (tokensToTry.length === 0) tokensToTry.push('');
+    if (tokensToTry.length === 0) tokensToTry.push({token: '', type: 'none'});
 
     let lastErrorPayload = null;
+    let triedAutoRefresh = false;
+    
     for (let i = 0; i < tokensToTry.length; i++) {
-      const token = tokensToTry[i];
+      const tokenInfo = tokensToTry[i];
+      const token = tokenInfo.token;
       const requestOptions = {
         method: options.method || 'GET',
         headers: {
@@ -530,7 +535,7 @@ function makeAuthenticatedRequest(endpoint, options) {
         }
       }
 
-      console.log('Making request to:', url, 'with token type:', token && token.startsWith('eyJ') ? 'JWT' : token ? 'other' : 'none');
+      console.log('Making request to:', url, 'with token type:', tokenInfo.type);
       const response = UrlFetchApp.fetch(url, requestOptions);
       const responseText = response.getContentText();
       const statusCode = response.getResponseCode();
@@ -573,19 +578,76 @@ function makeAuthenticatedRequest(endpoint, options) {
         return responseData;
       }
 
-      // If unauthorized and we have another token to try, continue loop
-      if (statusCode === 401 && i < tokensToTry.length - 1) {
-        const tokenType = i === 0 ? 'installation token' : 'access token';
-        console.warn('⚠️ Request unauthorized with ' + tokenType + '. Retrying with fallback token...');
-        console.warn('Response detail:', responseData.detail || responseData.message);
-        lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message || responseData.detail, raw: responseText };
-        continue;
+      // Handle 401 Unauthorized - try to auto-refresh token
+      if (statusCode === 401) {
+        console.warn('⚠️ Request unauthorized with', tokenInfo.type, 'token');
+        
+        // Try automatic token refresh if we have a refresh token and haven't tried yet
+        if (!triedAutoRefresh && tokenInfo.type !== 'installation') {
+          const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
+          
+          if (refreshToken && refreshToken.length > 20) {
+            console.log('🔄 Attempting automatic token refresh...');
+            triedAutoRefresh = true;
+            
+            const newAccessToken = refreshAccessToken(refreshToken);
+            
+            if (newAccessToken) {
+              console.log('✅ Token refreshed successfully! Retrying request...');
+              
+              // Retry the request with the new token
+              const retryOptions = {
+                method: options.method || 'GET',
+                headers: {
+                  'Authorization': `Bearer ${newAccessToken}`,
+                  'Content-Type': 'application/json'
+                },
+                muteHttpExceptions: true
+              };
+
+              if (options.payload) {
+                if (typeof options.payload === 'object') {
+                  retryOptions.payload = JSON.stringify(options.payload);
+                } else {
+                  retryOptions.payload = options.payload;
+                }
+              }
+
+              const retryResponse = UrlFetchApp.fetch(url, retryOptions);
+              const retryStatus = retryResponse.getResponseCode();
+              const retryText = retryResponse.getContentText();
+              
+              if (retryStatus >= 200 && retryStatus < 300) {
+                try {
+                  return JSON.parse(retryText);
+                } catch (e) {
+                  return { success: true, raw: retryText };
+                }
+              } else {
+                console.warn('⚠️ Retry after refresh also failed:', retryStatus);
+              }
+            } else {
+              console.warn('⚠️ Token refresh failed - user needs to sign in again');
+              // Clear tokens to force re-authentication
+              userProperties.deleteProperty(CACHED_TOKEN_KEY);
+              userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
+              userProperties.deleteProperty(REFRESH_TOKEN_KEY);
+            }
+          }
+        }
+        
+        // If we have another token to try, continue loop
+        if (i < tokensToTry.length - 1) {
+          console.warn('Retrying with fallback token...');
+          lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message || responseData.detail, raw: responseText };
+          continue;
+        }
       }
 
       // Log detailed error info for debugging
       console.error('❌ API request failed:', statusCode);
       console.error('Error message:', responseData.error || responseData.message || responseData.detail);
-      console.error('Token tried:', i === 0 ? 'installation token' : 'access token');
+      console.error('Token tried:', tokenInfo.type);
       
       const payload = {
         status: statusCode,
