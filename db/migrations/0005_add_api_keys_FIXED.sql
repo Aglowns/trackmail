@@ -1,10 +1,11 @@
--- Add API Keys Table for Gmail Add-on Authentication
+-- Add API Keys Table for Gmail Add-on Authentication (FIXED VERSION)
 -- API keys are simple, long-lived tokens that don't expire
 -- They're easier to manage than JWT tokens for external integrations
+-- This version is fully idempotent - safe to run multiple times
 
 BEGIN;
 
--- Create API keys table (idempotent - safe to run multiple times)
+-- Create API keys table (idempotent)
 CREATE TABLE IF NOT EXISTS api_keys (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -28,7 +29,7 @@ BEGIN
     END IF;
 END $$;
 
--- Create index on api_key for fast lookups
+-- Create indexes (idempotent)
 CREATE INDEX IF NOT EXISTS idx_api_keys_key ON api_keys(api_key);
 CREATE INDEX IF NOT EXISTS idx_api_keys_user_id ON api_keys(user_id);
 
