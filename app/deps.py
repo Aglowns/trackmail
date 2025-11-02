@@ -20,10 +20,11 @@ from typing import Annotated
 from fastapi import Depends, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
-from app.auth import get_current_user_id
+from app.auth import get_current_user_id, get_current_user_id_flexible
 
 # Re-export auth dependencies for convenience
-CurrentUserId = Annotated[str, Depends(get_current_user_id)]
+CurrentUserId = Annotated[str, Depends(get_current_user_id)]  # JWT only
+FlexibleUserId = Annotated[str, Depends(get_current_user_id_flexible)]  # API key OR JWT
 
 # HTTP Bearer token scheme for extracting raw token
 _token_security = HTTPBearer()

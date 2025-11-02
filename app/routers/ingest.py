@@ -32,7 +32,7 @@ router = APIRouter(prefix="/ingest", tags=["Email Ingestion"])
 @router.post("/email", response_model=IngestResponse)
 async def ingest_email(
     email_data: EmailIngest,
-    user_id: CurrentUserId,
+    user_id: FlexibleUserId,  # Supports API key (X-API-Key header) or JWT
 ) -> IngestResponse:
     """
     Receive and process a forwarded job application email.

@@ -22,12 +22,10 @@ function onGmailMessageOpen(e) {
   console.log('onGmailMessageOpen triggered');
   
   try {
-    // Check if user is authenticated by verifying we have a valid token
-    // Prefer cached access token; otherwise accept installation token
-    const accessToken = getAccessToken();
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    // Check if user is authenticated by verifying we have an API key
+    const apiKey = getApiKey();
     
-    if (!accessToken && !installationToken) {
+    if (!apiKey) {
       // User not authenticated - show sign-in card
       console.log('No valid access token found - showing sign-in card');
       return buildSignInCard();
@@ -97,11 +95,11 @@ function onGmailSettings(e) {
   console.log('onGmailSettings triggered');
   
   try {
-    // Check if user is authenticated by verifying we have a valid access token
-    const accessToken = getAccessToken();
+    // Check if user is authenticated by verifying we have an API key
+    const apiKey = getApiKey();
     const userEmail = getUserEmail();
     
-    if (!accessToken) {
+    if (!apiKey) {
       // User not authenticated - show sign-in card
       console.log('No valid access token found - showing sign-in card');
       return buildSignInCard();
@@ -591,7 +589,7 @@ function saveSessionHandleAction(e) {
     saveSessionHandle(sessionHandle.trim());
     
     // Verify it works by trying to get a token
-    const token = getAccessToken();
+    const apiKey = getApiKey();
     
     if (!token) {
       throw new Error('Failed to verify session handle. Please try again.');
@@ -724,10 +722,9 @@ function openTokenPageAction(e) {
 
   try {
     // Check if user is already authenticated
-    const accessToken = getAccessToken();
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    const apiKey = getApiKey();
     
-    if (accessToken || installationToken) {
+    if (apiKey) {
       // User is already authenticated - show success card with "Start Tracking" button
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -813,10 +810,9 @@ function checkAuthenticationAction(e) {
   
   try {
     // Check if user is already authenticated
-    const accessToken = getAccessToken();
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    const apiKey = getApiKey();
     
-    if (accessToken || installationToken) {
+    if (apiKey) {
       // User is already authenticated - show success card
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -903,10 +899,9 @@ function showTokenInputCard(e) {
   
   try {
     // Check if user is already authenticated
-    const accessToken = getAccessToken();
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
+    const apiKey = getApiKey();
     
-    if (accessToken || installationToken) {
+    if (apiKey) {
       // User is already authenticated - show success card
       console.log('User already authenticated - showing success card');
       return buildAuthSuccessCard();
@@ -971,77 +966,27 @@ function saveTokenAndConnect(e) {
   
   try {
     const formInputs = e.formInput || {};
-    const pastedToken = formInputs.refresh_token; // Field name is still 'refresh_token' for backward compat
+    const pastedApiKey = formInputs.refresh_token; // Field name is still 'refresh_token' for backward compat
     
-    if (!pastedToken || pastedToken.trim() === '') {
-      return buildErrorCard('Please paste a valid token');
+    if (!pastedApiKey || pastedApiKey.trim() === '') {
+      return buildErrorCard('Please paste a valid API key');
     }
     
-    const token = pastedToken.trim();
+    const apiKey = pastedApiKey.trim();
     
-    // Determine if this is an access token (JWT) or refresh token
-    // JWTs start with "eyJ" (base64 encoded JSON header)
-    const isAccessToken = token.startsWith('eyJ');
-    
-    console.log('Token type detected:', isAccessToken ? 'access token (JWT)' : 'refresh token');
-    console.log('Token length:', token.length);
-    
-    if (isAccessToken) {
-      console.log('Validating and saving access token...');
-
-      const payload = decodeJwtPayload(token);
-      if (!payload) {
-        return buildErrorCard('Invalid token format. Please copy the entire token from Settings.');
-      }
-
-      const userEmail = payload.email || Session.getActiveUser().getEmail();
-      const expiresIn = payload.exp ? Math.max(0, payload.exp - Math.floor(Date.now() / 1000)) : 3600;
-
-      const userProperties = PropertiesService.getUserProperties();
-      // Save installation token (365-day long-lived token)
-      userProperties.setProperty(INSTALLATION_TOKEN_KEY, token);
-      userProperties.setProperty(SESSION_HANDLE_KEY, token);
-      userProperties.setProperty(USER_EMAIL_KEY, userEmail);
-
-      // For installation tokens (365-day tokens), DO NOT set CACHED_TOKEN_EXPIRES_KEY
-      // The installation token will be validated by checking its JWT exp claim directly
-      // Only set expiry if it's a short-lived token (less than 24 hours)
-      const tokenExpiryMs = payload.exp ? (payload.exp * 1000) : (new Date().getTime() + (expiresIn * 1000));
-      const daysUntilExpiry = (tokenExpiryMs - Date.now()) / (1000 * 60 * 60 * 24);
-      
-      if (daysUntilExpiry < 1) {
-        // Short-lived token (less than 24 hours) - set expiry cache
-        userProperties.setProperty(CACHED_TOKEN_KEY, token);
-        userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, (tokenExpiryMs - 300000).toString());
-        console.log('Short-lived token cached, expires in:', Math.floor(expiresIn / 60), 'minutes');
-      } else {
-        // Long-lived token (installation token) - don't cache with expiry, it will be checked via JWT
-        console.log('✅ Installation token saved (365-day validity)');
-        console.log('Token expires in:', Math.floor(daysUntilExpiry), 'days');
-        // Clear any old cached token expiry
-        userProperties.deleteProperty(CACHED_TOKEN_KEY);
-        userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
-      }
-
-      console.log('Access token saved successfully for user:', userEmail);
-
-      const refreshToken = payload.refresh_token || null;
-      if (refreshToken) {
-        userProperties.setProperty(REFRESH_TOKEN_KEY, refreshToken);
-      }
-
-    } else {
-      // User pasted a refresh token - exchange it for an access token
-      console.log('Attempting to exchange refresh token for access token...');
-      const accessToken = refreshAccessToken(token);
-      
-      if (!accessToken) {
-        return buildErrorCard('Invalid token or connection failed. Please make sure you copied the entire token from the Settings page.');
-      }
+    // API keys start with "jobmail_"
+    if (!apiKey.startsWith('jobmail_')) {
+      return buildErrorCard('Invalid API key format. API keys should start with "jobmail_". Please copy the entire API key from Settings.');
     }
     
-    // Success! Token is valid and saved
-    const userEmail = getUserEmail() || Session.getActiveUser().getEmail();
+    console.log('Saving API key...');
+    console.log('API key length:', apiKey.length);
+    
+    // Save the API key (simple!)
+    const userEmail = Session.getActiveUser().getEmail();
+    saveApiKey(apiKey, userEmail);
+    
+    // Success! API key is saved
     
     return CardService.newActionResponseBuilder()
       .setNavigation(

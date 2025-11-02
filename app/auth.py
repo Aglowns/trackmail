@@ -24,11 +24,12 @@ Security considerations:
 
 from typing import Annotated
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 
 from app.config import settings
+from app.db import get_supabase_client
 
 JWT_SECRET = settings.supabase_jwt_secret or settings.supabase_anon_key
 if settings.supabase_jwt_secret is None:
@@ -183,8 +184,156 @@ async def get_current_user(
     return payload
 
 
+# ============================================================================
+# API KEY AUTHENTICATION
+# ============================================================================
+
+async def validate_api_key(api_key: str) -> str:
+    """
+    Validate an API key and return the associated user ID.
+    
+    API keys are simple, long-lived tokens that don't expire.
+    They're stored in the database and validated server-side.
+    
+    Args:
+        api_key: The API key string to validate
+        
+    Returns:
+        User ID (UUID as string) associated with the API key
+        
+    Raises:
+        HTTPException: 401 if API key is invalid or expired
+    """
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="API key is required",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+    
+    supabase = get_supabase_client()
+    
+    try:
+        # Query the API keys table using service role to bypass RLS
+        response = supabase.table("api_keys").select("user_id, expires_at, last_used_at").eq("api_key", api_key).maybe_single().execute()
+        
+        if not response.data:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid API key",
+                headers={"WWW-Authenticate": "ApiKey"},
+            )
+        
+        api_key_data = response.data
+        user_id = api_key_data.get("user_id")
+        expires_at = api_key_data.get("expires_at")
+        
+        # Check if API key has expired
+        if expires_at:
+            from datetime import datetime, timezone
+            expire_time = datetime.fromisoformat(expires_at.replace('Z', '+00:00'))
+            if expire_time < datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="API key has expired",
+                    headers={"WWW-Authenticate": "ApiKey"},
+                )
+        
+        # Update last_used_at timestamp
+        from datetime import datetime, timezone
+        now = datetime.now(timezone.utc).isoformat()
+        supabase.table("api_keys").update({"last_used_at": now}).eq("api_key", api_key).execute()
+        
+        return user_id
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error validating API key: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key",
+            headers={"WWW-Authenticate": "ApiKey"},
+        )
+
+
+async def get_user_id_from_api_key(
+    x_api_key: Annotated[str | None, Header(alias="X-API-Key")] = None
+) -> str | None:
+    """
+    Extract and validate API key from X-API-Key header.
+    
+    This is used as a dependency to support API key authentication.
+    Returns None if no API key is provided (fallback to JWT).
+    
+    Args:
+        x_api_key: API key from X-API-Key header
+        
+    Returns:
+        User ID if API key is valid, None otherwise
+    """
+    if not x_api_key:
+        return None
+    
+    try:
+        return await validate_api_key(x_api_key)
+    except HTTPException:
+        # Re-raise auth errors
+        raise
+
+
+async def get_current_user_id_flexible(
+    # Try API key first (from header)
+    api_key_user_id: Annotated[str | None, Depends(get_user_id_from_api_key)] = None,
+    # Fallback to JWT (from Authorization header)
+    jwt_credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(HTTPBearer(auto_error=False))] = None,
+) -> str:
+    """
+    Unified authentication dependency that supports both API keys and JWT tokens.
+    
+    Priority:
+    1. API key (X-API-Key header) - if present, use it
+    2. JWT token (Authorization: Bearer <token>) - fallback
+    
+    This allows endpoints to accept either authentication method,
+    making it easy to migrate from JWT to API keys.
+    
+    Args:
+        api_key_user_id: User ID from API key (if provided)
+        jwt_credentials: JWT credentials from Authorization header (if provided)
+        
+    Returns:
+        User ID (UUID as string)
+        
+    Raises:
+        HTTPException: 401 if neither authentication method is valid
+    """
+    # Try API key first
+    if api_key_user_id:
+        return api_key_user_id
+    
+    # Fallback to JWT
+    if jwt_credentials:
+        payload = verify_jwt_token(jwt_credentials.credentials)
+        user_id = payload.get("sub")
+        if user_id:
+            return user_id
+    
+    # Neither method provided or both failed
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Authentication required. Provide either X-API-Key header or Authorization Bearer token.",
+        headers={"WWW-Authenticate": "Bearer, ApiKey"},
+    )
+
+
 # Type aliases for cleaner dependency injection
 # Use these in route handlers for better type hints
+
+# Original JWT-only dependencies (for backward compatibility)
 CurrentUserId = Annotated[str, Depends(get_current_user_id)]
 CurrentUser = Annotated[dict, Depends(get_current_user)]
+
+# New flexible dependency (supports both API key and JWT)
+FlexibleUserId = Annotated[str, Depends(get_current_user_id_flexible)]
 

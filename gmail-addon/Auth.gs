@@ -19,11 +19,7 @@ const SUPABASE_URL = 'https://vhbnxzhvbawaqrgcddo6.supabase.co'; // Your Supabas
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZoYm54emh2YmF3YXFyZ2NkZG82Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDYxODQ1MzQsImV4cCI6MjA2MTc2MDUzNH0.JV5XHlMaBn3xqXBPnZOiwn7oqlCBMQaUiH4dVEjlKbQ'; // Your Supabase anon key
 
 // Storage keys
-const SESSION_HANDLE_KEY = 'jobmail_session_handle';
-const CACHED_TOKEN_KEY = 'jobmail_cached_token';
-const CACHED_TOKEN_EXPIRES_KEY = 'jobmail_token_expires';
-const REFRESH_TOKEN_KEY = 'jobmail_refresh_token';
-const INSTALLATION_TOKEN_KEY = 'jobmail_installation_token';
+const API_KEY_KEY = 'jobmail_api_key';  // Simple API key (never expires)
 const USER_EMAIL_KEY = 'jobmail_user_email';
 
 /**
@@ -71,50 +67,36 @@ function saveSessionHandle(sessionHandle) {
 }
 
 /**
- * Save JWT token, refresh token, and user email from Supabase auth.
- * This is called after user signs in on the frontend (ONE TIME SETUP).
+ * Save API key and user email.
+ * This is called after user pastes their API key from the Settings page.
  * 
- * @param {string} jwtToken - Supabase JWT access token
- * @param {string} refreshToken - Supabase refresh token (lasts forever)
- * @param {string} userEmail - User's email address
- * @param {number} expiresIn - Token expiry time in seconds (default 3600 = 1 hour)
+ * @param {string} apiKey - API key from Settings page
+ * @param {string} userEmail - User's email address (optional, can be extracted later)
  */
-function saveAuthToken(jwtToken, refreshToken, userEmail, expiresIn) {
+function saveApiKey(apiKey, userEmail) {
   const userProperties = PropertiesService.getUserProperties();
   
-  // Save JWT token
-  userProperties.setProperty(CACHED_TOKEN_KEY, jwtToken);
+  // Save API key (never expires!)
+  userProperties.setProperty(API_KEY_KEY, apiKey);
   
-  // Save refresh token (NEVER EXPIRES - this is the key!)
-  userProperties.setProperty(REFRESH_TOKEN_KEY, refreshToken);
+  // Save user email if provided
+  if (userEmail) {
+    userProperties.setProperty(USER_EMAIL_KEY, userEmail);
+  }
   
-  // Calculate expiry time (current time + expires_in seconds - 5 minute buffer)
-  const expiresInSeconds = expiresIn || 3600; // Default 1 hour
-  const expiresAt = new Date().getTime() + (expiresInSeconds * 1000) - 300000; // 5 min buffer
-  userProperties.setProperty(CACHED_TOKEN_EXPIRES_KEY, expiresAt.toString());
-  
-  // Save user email
-  userProperties.setProperty(USER_EMAIL_KEY, userEmail);
-  
-  // Also save as session handle for backward compatibility
-  userProperties.setProperty(SESSION_HANDLE_KEY, jwtToken);
-  
-  console.log('Auth token and refresh token saved for user:', userEmail);
+  console.log('✅ API key saved successfully');
+  console.log('API key never expires - no refresh needed!');
 }
 
 /**
- * Clear the stored session handle and cached tokens.
+ * Clear the stored API key and user data.
  */
 function clearSessionHandle() {
   const userProperties = PropertiesService.getUserProperties();
-  userProperties.deleteProperty(SESSION_HANDLE_KEY);
-  userProperties.deleteProperty(CACHED_TOKEN_KEY);
-  userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
-  userProperties.deleteProperty(REFRESH_TOKEN_KEY);
-  userProperties.deleteProperty(INSTALLATION_TOKEN_KEY);
+  userProperties.deleteProperty(API_KEY_KEY);
   userProperties.deleteProperty(USER_EMAIL_KEY);
   
-  console.log('Session cleared (including refresh token)');
+  console.log('✅ API key cleared - user needs to paste a new one');
 }
 
 /**
@@ -490,58 +472,58 @@ function testAuthentication() {
  * @param {Object} options - UrlFetchApp options
  * @return {Object} Parsed response data
  */
+/**
+ * Make an authenticated request to the backend API using API key.
+ * 
+ * Much simpler than JWT tokens - just send the API key in X-API-Key header!
+ * 
+ * @param {string} endpoint - API endpoint (e.g., '/ingest/email')
+ * @param {Object} options - Request options (method, payload, etc.)
+ * @return {Object} API response data
+ */
 function makeAuthenticatedRequest(endpoint, options) {
   console.log('Making authenticated request to:', endpoint);
   
   try {
-    // Tokens available
-    const accessToken = getAccessToken();
-    const installationToken = PropertiesService.getUserProperties().getProperty(INSTALLATION_TOKEN_KEY);
-    console.log('Token availability — access:', !!accessToken, 'installation:', !!installationToken);
+    // Get API key (simple - just one key, no expiration!)
+    const apiKey = getApiKey();
+    
+    if (!apiKey) {
+      throw new Error('API_ERROR::' + JSON.stringify({
+        status: 401,
+        message: 'API key required. Please paste your API key from Settings.',
+      }));
+    }
     
     const url = BACKEND_API_URL + endpoint;
-
-    const userProperties = PropertiesService.getUserProperties();
     
-    // Prefer installation token first (long-lived), then fallback to access token
-    const tokensToTry = [];
-    if (installationToken) tokensToTry.push({token: installationToken, type: 'installation'});
-    if (accessToken && accessToken !== installationToken) tokensToTry.push({token: accessToken, type: 'access'});
-
-    // Ensure we try at least one (empty string triggers 401 for clearer error path)
-    if (tokensToTry.length === 0) tokensToTry.push({token: '', type: 'none'});
-
-    let lastErrorPayload = null;
-    let triedAutoRefresh = false;
+    console.log('Using API key authentication');
     
-    for (let i = 0; i < tokensToTry.length; i++) {
-      const tokenInfo = tokensToTry[i];
-      const token = tokenInfo.token;
-      const requestOptions = {
-        method: options.method || 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        muteHttpExceptions: true
-      };
+    const requestOptions = {
+      method: options.method || 'GET',
+      headers: {
+        'X-API-Key': apiKey,  // Simple header - no Bearer token needed!
+        'Content-Type': 'application/json'
+      },
+      muteHttpExceptions: true
+    };
 
-      // Add payload if provided
-      if (options.payload) {
-        if (typeof options.payload === 'object') {
-          requestOptions.payload = JSON.stringify(options.payload);
-        } else {
-          requestOptions.payload = options.payload;
-        }
+    // Add payload if provided
+    if (options.payload) {
+      if (typeof options.payload === 'object') {
+        requestOptions.payload = JSON.stringify(options.payload);
+      } else {
+        requestOptions.payload = options.payload;
       }
+    }
 
-      console.log('Making request to:', url, 'with token type:', tokenInfo.type);
-      const response = UrlFetchApp.fetch(url, requestOptions);
-      const responseText = response.getContentText();
-      const statusCode = response.getResponseCode();
+    console.log('Making request to:', url);
+    const response = UrlFetchApp.fetch(url, requestOptions);
+    const responseText = response.getContentText();
+    const statusCode = response.getResponseCode();
     
     console.log('Response status:', statusCode);
-    console.log('Response body:', responseText);
+    console.log('Response body:', responseText.substring(0, 200));
     
     // Parse response
     let responseData;
@@ -549,7 +531,7 @@ function makeAuthenticatedRequest(endpoint, options) {
       responseData = JSON.parse(responseText);
     } catch (e) {
       // Backend returned non-JSON (likely HTML error page or plain text)
-      console.error('Failed to parse JSON response:', responseText);
+      console.error('Failed to parse JSON response:', responseText.substring(0, 200));
       
       // Try to extract useful error information
       let errorMessage = 'Server error';
@@ -574,96 +556,21 @@ function makeAuthenticatedRequest(endpoint, options) {
       };
     }
     
-      if (statusCode >= 200 && statusCode < 300) {
-        return responseData;
-      }
-
-      // Handle 401 Unauthorized - try to auto-refresh token
-      if (statusCode === 401) {
-        console.warn('⚠️ Request unauthorized with', tokenInfo.type, 'token');
-        
-        // Try automatic token refresh if we have a refresh token and haven't tried yet
-        if (!triedAutoRefresh && tokenInfo.type !== 'installation') {
-          const refreshToken = userProperties.getProperty(REFRESH_TOKEN_KEY);
-          
-          if (refreshToken && refreshToken.length > 20) {
-            console.log('🔄 Attempting automatic token refresh...');
-            triedAutoRefresh = true;
-            
-            const newAccessToken = refreshAccessToken(refreshToken);
-            
-            if (newAccessToken) {
-              console.log('✅ Token refreshed successfully! Retrying request...');
-              
-              // Retry the request with the new token
-              const retryOptions = {
-                method: options.method || 'GET',
-                headers: {
-                  'Authorization': `Bearer ${newAccessToken}`,
-                  'Content-Type': 'application/json'
-                },
-                muteHttpExceptions: true
-              };
-
-              if (options.payload) {
-                if (typeof options.payload === 'object') {
-                  retryOptions.payload = JSON.stringify(options.payload);
-                } else {
-                  retryOptions.payload = options.payload;
-                }
-              }
-
-              const retryResponse = UrlFetchApp.fetch(url, retryOptions);
-              const retryStatus = retryResponse.getResponseCode();
-              const retryText = retryResponse.getContentText();
-              
-              if (retryStatus >= 200 && retryStatus < 300) {
-                try {
-                  return JSON.parse(retryText);
-                } catch (e) {
-                  return { success: true, raw: retryText };
-                }
-              } else {
-                console.warn('⚠️ Retry after refresh also failed:', retryStatus);
-              }
-            } else {
-              console.warn('⚠️ Token refresh failed - user needs to sign in again');
-              // Clear tokens to force re-authentication
-              userProperties.deleteProperty(CACHED_TOKEN_KEY);
-              userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
-              userProperties.deleteProperty(REFRESH_TOKEN_KEY);
-            }
-          }
-        }
-        
-        // If we have another token to try, continue loop
-        if (i < tokensToTry.length - 1) {
-          console.warn('Retrying with fallback token...');
-          lastErrorPayload = { status: statusCode, message: responseData.error || responseData.message || responseData.detail, raw: responseText };
-          continue;
-        }
-      }
-
-      // Log detailed error info for debugging
-      console.error('❌ API request failed:', statusCode);
-      console.error('Error message:', responseData.error || responseData.message || responseData.detail);
-      console.error('Token tried:', tokenInfo.type);
-      
-      const payload = {
-        status: statusCode,
-        message: responseData.error || responseData.message || responseData.detail || 'Unknown error',
-        raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
-      };
-      throw new Error('API_ERROR::' + JSON.stringify(payload));
+    if (statusCode >= 200 && statusCode < 300) {
+      // Success!
+      return responseData;
     }
 
-    // If we exhausted retries, throw last captured 401
-    if (lastErrorPayload) {
-      throw new Error('API_ERROR::' + JSON.stringify(lastErrorPayload));
-    }
+    // Error response
+    console.error('❌ API request failed:', statusCode);
+    console.error('Error message:', responseData.error || responseData.message || responseData.detail);
     
-    // Fallback generic error
-    throw new Error('API_ERROR::' + JSON.stringify({ status: 401, message: 'Authentication required' }));
+    const payload = {
+      status: statusCode,
+      message: responseData.error || responseData.message || responseData.detail || 'Unknown error',
+      raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
+    };
+    throw new Error('API_ERROR::' + JSON.stringify(payload));
     
   } catch (error) {
     console.error('Error in makeAuthenticatedRequest:', error);
