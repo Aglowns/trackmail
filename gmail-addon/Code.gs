@@ -591,7 +591,7 @@ function saveSessionHandleAction(e) {
     // Verify it works by trying to get a token
     const apiKey = getApiKey();
     
-    if (!token) {
+    if (!apiKey) {
       throw new Error('Failed to verify session handle. Please try again.');
     }
     
@@ -683,14 +683,14 @@ function fetchEmailData(messageId, accessToken) {
       subject: message.getSubject(),
       text_body: message.getPlainBody(),
       html_body: message.getBody(),
-    received_at: message.getDate().toISOString(),
+      received_at: message.getDate().toISOString(),
       user_email: userEmail || 'aglonoop@gmail.com' // Include user email for backend
     };
     
     // Clean up the email data to ensure it's properly formatted
-    // Remove any null or undefined values that might cause issues
+    // Remove any null or undefined values that might cause issues (but preserve received_at!)
     Object.keys(emailData).forEach(key => {
-      if (emailData[key] === null || emailData[key] === undefined) {
+      if (key !== 'received_at' && (emailData[key] === null || emailData[key] === undefined)) {
         emailData[key] = '';
       }
     });
@@ -699,7 +699,8 @@ function fetchEmailData(messageId, accessToken) {
       sender: emailData.sender,
       subject: emailData.subject,
       has_text: !!emailData.text_body,
-      has_html: !!emailData.html_body
+      has_html: !!emailData.html_body,
+      received_at: emailData.received_at
     });
     
     return emailData;

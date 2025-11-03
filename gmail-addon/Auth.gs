@@ -41,29 +41,35 @@ function getBackendApiUrl() {
 }
 
 /**
- * Get the stored session handle.
+ * Get the stored API key.
+ * 
+ * @return {string|null} API key or null if not found
+ */
+function getApiKey() {
+  const userProperties = PropertiesService.getUserProperties();
+  return userProperties.getProperty(API_KEY_KEY);
+}
+
+/**
+ * Get the stored session handle (deprecated - use getApiKey instead).
  * 
  * @return {string|null} Session handle or null if not found
  */
 function getSessionHandle() {
   const userProperties = PropertiesService.getUserProperties();
-  return userProperties.getProperty(SESSION_HANDLE_KEY);
+  return userProperties.getProperty(API_KEY_KEY);  // Return API key for backward compatibility
 }
 
 /**
- * Save a session handle to user properties.
+ * Save a session handle to user properties (deprecated - use saveApiKey instead).
  * 
  * @param {string} sessionHandle - The session handle to save
  */
 function saveSessionHandle(sessionHandle) {
   const userProperties = PropertiesService.getUserProperties();
-  userProperties.setProperty(SESSION_HANDLE_KEY, sessionHandle);
+  userProperties.setProperty(API_KEY_KEY, sessionHandle);  // Save as API key
   
-  // Clear cached token when session changes
-  userProperties.deleteProperty(CACHED_TOKEN_KEY);
-  userProperties.deleteProperty(CACHED_TOKEN_EXPIRES_KEY);
-  
-  console.log('Session handle saved');
+  console.log('Session handle saved as API key');
 }
 
 /**
@@ -438,21 +444,12 @@ function decodeJwtPayload(token) {
  * @return {Object} Test result with status and details
  */
 function testAuthentication() {
-  const sessionHandle = getSessionHandle();
+  const apiKey = getApiKey();
   
-  if (!sessionHandle) {
+  if (!apiKey) {
     return {
       authenticated: false,
-      message: 'No session handle found. Please sign in.'
-    };
-  }
-  
-  const token = getAccessToken();
-  
-  if (!token) {
-    return {
-      authenticated: false,
-      message: 'Failed to get access token. Session may have expired.'
+      message: 'No API key found. Please paste your API key from Settings.'
     };
   }
   
