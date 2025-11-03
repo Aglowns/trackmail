@@ -326,6 +326,7 @@ async def ingest_email(
             status=normalized_status,
             notes=f"Auto-created from email. Confidence: {parsed.get('confidence', 0)}",
             applied_at=email_data.received_at,  # Use email received date as applied_at
+            source_url=parsed.get("source_url"),  # Use the job URL from email parsing
         )
         
         print(f"🔍 CRITICAL DEBUG: ApplicationCreate object created: company='{app_data.company}', position='{app_data.position}', status='{app_data.status}'")
