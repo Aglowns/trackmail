@@ -13,7 +13,7 @@ This is the core endpoint that the Gmail Add-on or email forwarding service call
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.deps import CurrentUserId
+from app.deps import CurrentUserId, FlexibleUserId  # FlexibleUserId supports both API keys and JWT
 from app.schemas import EmailIngest, IngestResponse, ApplicationCreate
 from app.services.parsing import EmailParser, parse_job_application_email
 from app.services.emails import (
