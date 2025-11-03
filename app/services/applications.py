@@ -237,7 +237,7 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
         "source_url": data.source_url,
         "location": data.location,
         "notes": data.notes,
-        "applied_at": data.applied_at,
+        "applied_at": data.applied_at.isoformat() if data.applied_at and isinstance(data.applied_at, datetime) else data.applied_at,
     }
     
     # Insert into database
