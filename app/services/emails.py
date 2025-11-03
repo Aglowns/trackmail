@@ -228,13 +228,20 @@ async def store_email_message(
     email_hash = generate_email_hash(email_data)
     
     # Prepare email record
+    # Handle received_at: convert datetime to ISO string if needed
+    received_at_value = email_data.received_at
+    if received_at_value and isinstance(received_at_value, datetime):
+        received_at_value = received_at_value.isoformat()
+    elif not received_at_value:
+        received_at_value = datetime.utcnow().isoformat()
+    
     email_record = {
         "application_id": application_id,
         "sender": email_data.sender,
         "subject": email_data.subject,
         "text_body": email_data.text_body,
         "html_body": email_data.html_body,
-        "received_at": email_data.received_at or datetime.utcnow(),
+        "received_at": received_at_value,
         "parsed_data": {
             "email_hash": email_hash,
             # Store pre-parsed fields if available
