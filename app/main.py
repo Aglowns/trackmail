@@ -14,7 +14,7 @@ from app.routers import applications, events, ingest, health, profiles, auth, su
 
 
 @asynccontextmanager
-def lifespan(app: FastAPI):  # noqa: D401
+async def lifespan(app: FastAPI):  # noqa: D401
     """Manage application startup and shutdown."""
     print(f"ðŸš€ JobMail API starting in {settings.environment} mode")
     print("ðŸ“ Docs available at /docs")
