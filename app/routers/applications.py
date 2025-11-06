@@ -92,6 +92,13 @@ async def create_application(
     The application will be associated with the authenticated user.
     Row-Level Security ensures the user_id is set correctly.
     
+    Subscription Limits:
+    - Free tier: Limited to 25 applications
+    - Pro tier: Unlimited applications
+
+    Raises:
+        403: Subscription limit exceeded (free tier)
+    
     Args:
         data: Application data (company, position, status, etc.)
         user_id: Automatically extracted from JWT token

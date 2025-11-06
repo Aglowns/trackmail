@@ -1,4 +1,4 @@
-"""
+﻿"""
 Application Service
 
 Business logic for managing job applications.
@@ -17,6 +17,7 @@ from typing import Optional, List, Dict, Any
 from uuid import UUID
 from datetime import datetime, timedelta
 
+from fastapi import HTTPException, status
 from supabase import Client
 from app.schemas import ApplicationCreate, ApplicationUpdate
 from app.db import get_supabase_client
@@ -66,7 +67,7 @@ class ApplicationService:
                 try:
                     application_data['user_id'] = await self._get_or_create_test_user()
                 except Exception as user_error:
-                    print(f"⚠️ Could not create test user: {user_error}")
+                    print(f"âš ï¸ Could not create test user: {user_error}")
                     # For testing, we'll create the application anyway
                     # This might fail due to foreign key constraint, but let's try
                     application_data['user_id'] = "00000000-0000-0000-0000-000000000001"
@@ -83,12 +84,12 @@ class ApplicationService:
             result = self.supabase.table("profiles").select("id").eq("email", email).execute()
             if result.data and len(result.data) > 0:
                 user_id = result.data[0]['id']
-                print(f"✅ Found user by email {email}: {user_id}")
+                print(f"âœ… Found user by email {email}: {user_id}")
                 return user_id
-            print(f"⚠️ No user found for email: {email}")
+            print(f"âš ï¸ No user found for email: {email}")
             return None
         except Exception as e:
-            print(f"⚠️ Error looking up user by email: {e}")
+            print(f"âš ï¸ Error looking up user by email: {e}")
             return None
     
     async def _get_or_create_test_user(self) -> str:
@@ -99,7 +100,7 @@ class ApplicationService:
             # Try to find existing test user first
             result = self.supabase.table("profiles").select("id").eq("id", test_user_id).execute()
             if result.data:
-                print(f"✅ Found existing test user: {test_user_id}")
+                print(f"âœ… Found existing test user: {test_user_id}")
                 return test_user_id
         except:
             pass
@@ -121,11 +122,11 @@ class ApplicationService:
                 'params': [test_user_id, 'test@trackmail.app', 'Test User']
             }).execute()
             
-            print(f"✅ Created test user via SQL: {test_user_id}")
+            print(f"âœ… Created test user via SQL: {test_user_id}")
             return test_user_id
             
         except Exception as sql_error:
-            print(f"⚠️ SQL creation failed: {sql_error}")
+            print(f"âš ï¸ SQL creation failed: {sql_error}")
             
             # Fallback: try regular insert one more time
             try:
@@ -138,11 +139,11 @@ class ApplicationService:
                 }
                 
                 profile_result = self.supabase.table("profiles").insert(profile_data).execute()
-                print(f"✅ Created test user via table insert: {test_user_id}")
+                print(f"âœ… Created test user via table insert: {test_user_id}")
                 return test_user_id
                 
             except Exception as final_error:
-                print(f"⚠️ All profile creation methods failed: {final_error}")
+                print(f"âš ï¸ All profile creation methods failed: {final_error}")
                 # Return the test ID anyway - the application creation might still work
                 # if the profile exists from a previous run
                 return test_user_id
@@ -170,12 +171,23 @@ class ApplicationService:
     async def create_or_update_application(self, parsed_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create or update application based on parsed email data"""
         try:
+            user_id = parsed_data.get('user_id')
+            if not user_id:
+                raise ValueError("user_id is required in parsed_data")
+            
             # Look for existing application with same company and position
             company = parsed_data.get('company')
             position = parsed_data.get('position')
             
             if company and position:
-                existing = self.supabase.table("applications").select("*").eq("company", company).eq("position", position).execute()
+                existing = (
+                    self.supabase.table("applications")
+                    .select("*")
+                    .eq("user_id", user_id)
+                    .eq("company", company)
+                    .eq("position", position)
+                    .execute()
+                )
                 
                 if existing.data:
                     # Update existing application
@@ -186,20 +198,55 @@ class ApplicationService:
                     }
                     return await self.update_application(app_id, updates)
             
-            # Create new application
-            app_data = {
-                "company": company or "Unknown Company",
-                "position": position or "Unknown Position", 
-                "status": parsed_data.get('status', 'applied'),
-                "source_url": parsed_data.get('source_url'),
-                "location": parsed_data.get('location'),
-                "notes": f"Created from email: {parsed_data.get('email_subject', '')}",
-                "user_id": parsed_data.get('user_id'),  # Include user_id from parsed data
-                "applied_at": parsed_data.get('applied_at'),
-            }
+            # Check subscription limits before creating new application
+            from app.services.subscription import get_subscription_service
+            subscription_service = get_subscription_service()
+            can_create, error_message = await subscription_service.can_create_application(user_id)
             
-            return await self.create_application(app_data)
+            if not can_create:
+                # Limit exceeded - raise HTTPException
+                current_count = await subscription_service.get_user_application_count(user_id)
+                subscription = await subscription_service.get_user_subscription(user_id)
+                
+                # Safely extract plan data
+                plan = subscription.get("subscription_plans")
+                if isinstance(plan, dict):
+                    features = plan.get("features", {})
+                    limit = features.get("max_applications", 25)
+                else:
+                    # Fallback to default limit
+                    limit = 25
+                
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail={
+                        "error": "limit_exceeded",
+                        "message": error_message,
+                        "upgrade_required": True,
+                        "current_count": current_count,
+                        "limit": limit,
+                        "upgrade_url": "/subscription/upgrade"
+                    },
+                )
             
+            # Create new application using the standalone function that properly handles limits
+            from app.schemas import ApplicationCreate
+            app_create_data = ApplicationCreate(
+                company=company or "Unknown Company",
+                position=position or "Unknown Position",
+                status=parsed_data.get('status', 'applied'),
+                source_url=parsed_data.get('source_url'),
+                location=parsed_data.get('location'),
+                notes=f"Created from email: {parsed_data.get('email_subject', '')}",
+                applied_at=parsed_data.get('applied_at'),
+            )
+            
+            # Use the standalone create_application function which has subscription checks
+            return await create_application(user_id=user_id, data=app_create_data)
+            
+        except HTTPException:
+            # Re-raise HTTP exceptions (like limit exceeded)
+            raise
         except Exception as e:
             print(f"Error creating/updating application: {e}")
             raise
@@ -208,27 +255,52 @@ class ApplicationService:
 async def create_application(user_id: str, data: ApplicationCreate) -> dict:
     """
     Create a new job application for a user.
-    
+
     This function:
-    1. Validates the input data (already done by Pydantic)
-    2. Inserts into the database
-    3. Returns the created application
-    
+    1. Checks subscription limits before creation
+    2. Validates the input data (already done by Pydantic)
+    3. Inserts into the database
+    4. Returns the created application
+
     RLS automatically ensures the user_id is set correctly.
-    
+
     Args:
         user_id: UUID of the authenticated user
         data: Application data from request
-        
+
     Returns:
         Created application record
-        
+
     Raises:
+        HTTPException: If subscription limit is exceeded
         Exception: If database operation fails
     """
+    from app.services.subscription import get_subscription_service
+
+    subscription_service = get_subscription_service()
+    can_create, error_message = await subscription_service.can_create_application(user_id)
+
+    if not can_create:
+        current_count = await subscription_service.get_user_application_count(user_id)
+        subscription = await subscription_service.get_user_subscription(user_id)
+        plan = subscription.get("subscription_plans", {})
+        features = plan.get("features", {})
+        limit = features.get("max_applications", 25)
+
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={
+                "error": "limit_exceeded",
+                "message": error_message,
+                "upgrade_required": True,
+                "current_count": current_count,
+                "limit": limit,
+                "upgrade_url": "/subscription/upgrade"
+            },
+        )
+
     supabase = get_supabase_client()
-    
-    # Prepare application data
+
     app_data = {
         "user_id": user_id,
         "company": data.company,
@@ -239,13 +311,12 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
         "notes": data.notes,
         "applied_at": data.applied_at.isoformat() if data.applied_at and isinstance(data.applied_at, datetime) else data.applied_at,
     }
-    
-    # Insert into database
+
     try:
         result = supabase.table("applications").insert(app_data).execute()
     except Exception as exc:  # pragma: no cover - log full context for production debugging
         print(
-            "❌ Supabase insert exception in create_application:",
+            "Supabase insert exception in create_application:",
             {
                 "user_id": user_id,
                 "company": data.company,
@@ -255,11 +326,11 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
             },
         )
         raise
-    
+
     error = getattr(result, "error", None)
     if error:
         print(
-            "❌ Supabase insert error in create_application:",
+            "Supabase insert error in create_application:",
             {
                 "user_id": user_id,
                 "company": data.company,
@@ -269,10 +340,10 @@ async def create_application(user_id: str, data: ApplicationCreate) -> dict:
             },
         )
         raise Exception(f"Supabase error creating application: {error}")
-    
+
     if not result.data:
         raise Exception("Failed to create application: empty response")
-    
+
     return result.data[0]
 
 
