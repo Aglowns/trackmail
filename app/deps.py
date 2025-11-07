@@ -15,9 +15,9 @@ Benefits:
 - Clean code - keeps route handlers focused on business logic
 """
 
-from typing import Annotated
+from typing import Annotated, Callable
 
-from fastapi import Depends, Query
+from fastapi import Depends, Query, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth import get_current_user_id, get_current_user_id_flexible
@@ -171,4 +171,49 @@ async def require_admin():
     # if user.get("role") != "admin":
     #     raise HTTPException(status_code=403, detail="Admin access required")
     pass
+
+
+def require_feature(feature_name: str):
+    """
+    Dependency factory that requires a specific subscription feature.
+    
+    This dependency:
+    1. First authenticates the user (via CurrentUserId)
+    2. Then checks if they have the required feature
+    3. Returns user_id if both checks pass
+    
+    Usage:
+        @router.get("/analytics/advanced")
+        async def get_advanced_analytics(
+            user_id: str = Depends(require_feature("advanced_analytics"))
+        ):
+            # Only users with advanced_analytics feature can access this
+            # user_id is automatically extracted from JWT and validated
+            ...
+    
+    Args:
+        feature_name: Name of the feature to check (e.g., "advanced_analytics", "export_data")
+        
+    Returns:
+        Dependency that checks authentication and feature access
+    """
+    async def feature_checker(user_id: CurrentUserId):
+        from app.services.subscription import get_subscription_service
+        
+        subscription_service = get_subscription_service()
+        has_access = await subscription_service.check_feature_access(user_id, feature_name)
+        
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "error": "feature_unavailable",
+                    "message": f"Upgrade to Pro to access {feature_name}",
+                    "upgrade_required": True,
+                    "feature": feature_name,
+                }
+            )
+        return user_id
+    
+    return feature_checker
 

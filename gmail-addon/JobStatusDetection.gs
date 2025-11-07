@@ -71,6 +71,31 @@ function normalizeStatusForJobListings(result, htmlBody, subject, sender) {
   if (result.isJobRelated === false) {
     return result;
   }
+  
+  // CRITICAL: Don't filter out emails that contain rejection/interview/offer phrases
+  // These are legitimate job application emails, not job listings
+  const jobApplicationPhrases = [
+    'decided to pursue other candidates',
+    'decided to move forward with other candidates',
+    'not selected',
+    'unfortunately',
+    'we have reviewed your resume',
+    'interview',
+    'offer',
+    'congratulations',
+    'thank you for applying',
+    'application received',
+    'we have received your application'
+  ];
+  
+  const hasJobApplicationPhrase = jobApplicationPhrases.some(phrase => text.includes(phrase));
+  
+  // If it contains job application phrases, it's definitely job-related
+  if (hasJobApplicationPhrase) {
+    return result;
+  }
+  
+  // Only filter as job listing if it doesn't have application phrases
   if (isJobListingEmail(text, subject, sender)) {
     return buildNotJobRelatedResult('Detected job newsletter/broadcast email');
   }
@@ -250,14 +275,25 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
   const statusPatterns = {
     'rejected': {
       patterns: [
+        'we have decided to move forward with other candidates', // EXACT PHRASE - highest priority
+        'decided to move forward with other candidates',
+        'move forward with other candidates',
+        'moved forward with other candidates',
+        'we have decided to pursue other candidates', // EXACT PHRASE from Martin Marietta email
+        'decided to pursue other candidates',
+        'pursue other candidates',
+        'pursued other candidates',
         'not selected', 'unfortunately', 'not moving forward', 'not a good fit',
         'decided to go with another candidate', 'not chosen', 'rejection',
         'not proceed', 'not advance', 'not selected for', 'not move forward',
         'not the right fit', 'not move to the next stage', 'not advance to',
         'not selected to continue', 'not selected for the next round',
         'we have decided to pursue another candidate', 'decided to pursue another',
-        'pursue another candidate', 'another candidate', 'not the right fit',
-        'not selected to continue', 'not advance to the next stage'
+        'pursue another candidate', 'another candidate',
+        'not advance to the next stage',
+        'better match the qualifications', // Often appears with rejections
+        'we have reviewed your resume and have carefully considered', // Martin Marietta pattern
+        'decided to pursue other candidates for this position' // Full Martin Marietta phrase
       ],
       confidence: 95
     },

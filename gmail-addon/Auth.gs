@@ -562,9 +562,38 @@ function makeAuthenticatedRequest(endpoint, options) {
     console.error('❌ API request failed:', statusCode);
     console.error('Error message:', responseData.error || responseData.message || responseData.detail);
     
+    // Extract structured error details
+    let errorMessage = responseData.error || responseData.message;
+    let errorDetail = responseData.detail;
+    
+    // If detail is an object, preserve it for structured error handling
+    if (errorDetail && typeof errorDetail === 'object') {
+      // Keep detail as object - don't convert to string
+    } else if (errorDetail && typeof errorDetail === 'string') {
+      // Try to parse if it looks like JSON
+      try {
+        const parsedDetail = JSON.parse(errorDetail);
+        if (typeof parsedDetail === 'object') {
+          errorDetail = parsedDetail;
+        }
+      } catch (e) {
+        // Keep as string if parsing fails
+      }
+    }
+    
+    // If no message, try to extract from detail
+    if (!errorMessage && errorDetail) {
+      if (typeof errorDetail === 'object' && errorDetail.message) {
+        errorMessage = errorDetail.message;
+      } else if (typeof errorDetail === 'string') {
+        errorMessage = errorDetail;
+      }
+    }
+    
     const payload = {
       status: statusCode,
-      message: responseData.error || responseData.message || responseData.detail || 'Unknown error',
+      message: errorMessage || 'Unknown error',
+      detail: errorDetail,  // Preserve detail as object if possible
       raw: typeof responseText === 'string' ? responseText.substring(0, 1000) : ''
     };
     throw new Error('API_ERROR::' + JSON.stringify(payload));

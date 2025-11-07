@@ -54,9 +54,10 @@ function buildSignInCard() {
  * 
  * @param {string} messageId - Gmail message ID
  * @param {string} accessToken - Gmail API access token
+ * @param {Object} subscription - Subscription status (optional)
  * @return {Card} Tracking card
  */
-function buildTrackingCard(messageId, accessToken) {
+function buildTrackingCard(messageId, accessToken, subscription) {
   const userEmail = getUserEmail() || 'Unknown user';
   
   // Fetch basic email data for preview (lightweight)
@@ -95,10 +96,33 @@ function buildTrackingCard(messageId, accessToken) {
     
     // Use advanced AI parsing for accurate classification
     console.log('Starting advanced AI parsing...');
+    let statusDetection = null;
     try {
       // Try ultra-accurate parsing first (with OpenAI)
       parsingResults = ultraAccurateEmailParsing(emailData.html_body || '', subject, emailData.sender || '');
       console.log('Advanced parsing results:', parsingResults);
+      
+      // Also run status detection to get more accurate rejection detection
+      console.log('Running status detection for better accuracy...');
+      try {
+        statusDetection = detectJobApplicationStatus(
+          emailData.html_body || '', 
+          emailData.subject || '', 
+          emailData.sender || '', 
+          parsingResults.company, 
+          parsingResults.position
+        );
+        console.log('Status detection results:', statusDetection);
+        
+        // Override emailType with status detection if it's more specific
+        if (statusDetection && statusDetection.status === 'rejected' && parsingResults.emailType !== 'rejected') {
+          console.log('✅ Status detection found rejection - overriding emailType');
+          parsingResults.emailType = 'rejected';
+        }
+      } catch (statusError) {
+        console.error('Status detection failed:', statusError);
+        // Continue with parsing results
+      }
     } catch (parseError) {
       console.error('Advanced parsing failed, using fallback:', parseError);
       // Fallback to quick parsing
@@ -120,7 +144,21 @@ function buildTrackingCard(messageId, accessToken) {
     // Extract data from parsing results
     const companyName = parsingResults.company || 'Unknown Company';
     const jobPosition = parsingResults.position || 'Unknown Position';
-    const emailType = parsingResults.emailType || 'unknown';
+    let emailType = parsingResults.emailType || 'unknown';
+    
+    // Use status detection to override email type if available
+    if (statusDetection && statusDetection.status) {
+      if (statusDetection.status === 'rejected') {
+        emailType = 'rejected';
+      } else if (statusDetection.status === 'interview_scheduled') {
+        emailType = 'interview_scheduled';
+      } else if (statusDetection.status === 'offer_received') {
+        emailType = 'offer_received';
+      } else if (statusDetection.status === 'applied' && emailType === 'unknown') {
+        emailType = 'applied';
+      }
+    }
+    
     jobUrl = normalizeJobUrl(
       parsingResults.jobUrl || parsingResults.job_url || parsingResults.jobURL
     );
@@ -275,6 +313,163 @@ function buildTrackingCard(messageId, accessToken) {
  * @param {Object} result - Ingestion result from backend
  * @return {Card} Success card
  */
+/**
+ * Build upgrade card when application limit is reached.
+ * 
+ * @param {Object} errorDetails - Error details from backend
+ * @return {Card} Upgrade prompt card
+ */
+function buildUpgradeCard(errorDetails) {
+  const currentCount = errorDetails.current_count || errorDetails.currentCount || 25;
+  const limit = errorDetails.limit || 25;
+  const message = errorDetails.message || 'You\'ve reached your application limit. Upgrade to Pro for unlimited applications.';
+  
+  // Calculate percentage used
+  const percentageUsed = Math.round((currentCount / limit) * 100);
+  
+  const card = CardService.newCardBuilder()
+    .setHeader(
+      CardService.newCardHeader()
+        .setTitle('📧 JobMail')
+        .setSubtitle('Upgrade to Pro')
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newDecoratedText()
+            .setTopLabel('🎯')
+            .setText('<font color="#EF4444" size="MEDIUM"><b>Application Limit Reached</b></font>')
+            .setWrapText(true)
+        )
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<font color="#1F2937" size="MEDIUM"><b>' + message + '</b></font>')
+        )
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<font color="#6B7280">You\'ve used <font color="#EF4444" size="MEDIUM"><b>' + currentCount + ' of ' + limit + '</b></font> applications on the Free plan.</font>')
+        )
+    )
+    .addSection(
+      CardService.newCardSection()
+        .setHeader('<font color="#1F2937"><b>✨ Pro Features</b></font>')
+        .addWidget(
+          CardService.newDecoratedText()
+            .setIconUrl('https://fonts.gstatic.com/s/i/materialicons/check_circle/v8/24px.svg')
+            .setIconAltText('Unlimited')
+            .setTopLabel('Unlimited Applications')
+            .setText('<font color="#10B981"><b>Track unlimited job applications</b></font>')
+            .setBottomLabel('No more limits on your job search')
+            .setWrapText(true)
+        )
+        .addWidget(
+          CardService.newDecoratedText()
+            .setIconUrl('https://fonts.gstatic.com/s/i/materialicons/auto_awesome/v8/24px.svg')
+            .setIconAltText('Auto Track')
+            .setTopLabel('Automatic Tracking')
+            .setText('<font color="#10B981"><b>AI-powered automatic email tracking</b></font>')
+            .setBottomLabel('Applications tracked automatically from your emails')
+            .setWrapText(true)
+        )
+        .addWidget(
+          CardService.newDecoratedText()
+            .setIconUrl('https://fonts.gstatic.com/s/i/materialicons/analytics/v8/24px.svg')
+            .setIconAltText('Analytics')
+            .setTopLabel('Advanced Analytics')
+            .setText('<font color="#10B981"><b>Detailed insights and reports</b></font>')
+            .setBottomLabel('Track your job search performance')
+            .setWrapText(true)
+        )
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextButton()
+            .setText('🚀 Upgrade to Pro Now')
+            .setBackgroundColor('#6366F1')
+            .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+            .setOnClickAction(
+              CardService.newAction()
+                .setFunctionName('openUpgradePageAction')
+            )
+        )
+        .addWidget(
+          CardService.newTextButton()
+            .setText('← Back')
+            .setTextButtonStyle(CardService.TextButtonStyle.TEXT)
+            .setOnClickAction(
+              CardService.newAction()
+                .setFunctionName('onGmailMessageOpen')
+            )
+        )
+    )
+    .build();
+  
+  return card;
+}
+
+/**
+ * Build auto-tracking success card for Pro users.
+ * 
+ * @param {Object} result - Auto-tracking result
+ * @return {Card} Auto-tracking success card
+ */
+function buildAutoTrackingSuccessCard(result) {
+  let message = '✅ Application tracked automatically!';
+  let detailText = '';
+  
+  if (result && result.duplicate) {
+    message = '✅ This email was already tracked automatically.';
+  }
+  
+  if (result && result.message) {
+    detailText = result.message;
+  }
+  if (result && result.application_id) {
+    detailText += '<br><br><font color="#6b7280"><i>Application ID: ' + result.application_id + '</i></font>';
+  }
+  
+  const card = CardService.newCardBuilder()
+    .setHeader(
+      CardService.newCardHeader()
+        .setTitle('📧 JobMail')
+        .setSubtitle('Auto-Tracked!')
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newDecoratedText()
+            .setTopLabel('🤖')
+            .setText(message)
+            .setWrapText(true)
+        )
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText('<font color="#10b981"><b>✨ Pro Feature Active</b></font><br>' +
+                     '<font color="#6b7280">Your application was automatically tracked from this email.</font>')
+        )
+        .addWidget(
+          CardService.newTextParagraph()
+            .setText(detailText)
+        )
+    )
+    .addSection(
+      CardService.newCardSection()
+        .addWidget(
+          CardService.newTextButton()
+            .setText('← Back')
+            .setBackgroundColor('#6366f1')
+            .setOnClickAction(
+              CardService.newAction()
+                .setFunctionName('onGmailMessageOpen')
+            )
+        )
+    )
+    .build();
+  
+  return card;
+}
+
 function buildSuccessCard(result) {
   console.log('Building success card with result:', JSON.stringify(result));
   

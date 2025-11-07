@@ -46,3 +46,8 @@ WHERE app.applied_at IS NULL;
 
 After running the query, refresh your frontend applications page and you should see dates in the "Date Applied" column!
 
+
+
+
+
+

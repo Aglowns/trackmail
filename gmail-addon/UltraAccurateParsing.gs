@@ -144,7 +144,15 @@ function openAIPoweredEmailParsing(htmlBody, subject, sender) {
 5. Confidence score (0-100)
 
 CRITICAL REJECTION INDICATORS - if you see these phrases, classify as "rejected":
+- "we have decided to pursue other candidates" (EXACT PHRASE - highest priority, e.g., Martin Marietta)
+- "decided to pursue other candidates"
+- "pursue other candidates for this position"
+- "we have reviewed your resume and have carefully considered" (often followed by rejection)
 - "we have decided to pursue another candidate"
+- "we have decided to move forward with other candidates" (EXACT PHRASE - highest priority)
+- "decided to move forward with other candidates"
+- "move forward with other candidates"
+- "moved forward with other candidates"
 - "not selected to move forward"
 - "unfortunately"
 - "not moving forward"
@@ -153,7 +161,6 @@ CRITICAL REJECTION INDICATORS - if you see these phrases, classify as "rejected"
 - "haven't been selected"
 - "not chosen"
 - "after careful consideration, we've decided"
-- "moved forward with other candidates"
 - "will not be moving your application forward"
 - "not selected for the next phase"
 - "not advance to the next stage"
@@ -163,6 +170,7 @@ CRITICAL REJECTION INDICATORS - if you see these phrases, classify as "rejected"
 - "not selected to continue"
 - "not chosen for this role"
 - "not selected for this position"
+- "better match the qualifications" (often appears with rejections)
 
 CRITICAL SUCCESS INDICATORS - if you see these phrases, classify appropriately:
 - "congratulations" = offer_received
@@ -184,8 +192,13 @@ EXAMPLES:
 IMPORTANT: 
 - Extract the FULL job position title, not just "Intern" or "Engineer"
 - Look for complete titles like "Summer 2026 Information Technology Intern - Remote" or "Software Developer Intern"
-- Be accurate with company names - extract the actual company name from the email
+- Be accurate with company names - extract the actual company name from:
+  * Sender name (e.g., "Syngenta Crop Protection Hiring Team" → "Syngenta Crop Protection")
+  * Email body (look for "at [Company Name]" or company mentions)
+  * Sender email domain (e.g., "careers.syngenta.com" → "Syngenta")
+  * Subject line if it mentions the company
 - Work for ANY company, not just specific ones
+- If sender is "Company Name Hiring Team" or "Company Name Careers", extract "Company Name"
 
 Return ONLY a JSON object with these fields: company, position, emailType, jobUrl, confidence.`
           },
@@ -258,15 +271,58 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
     }
   }
   
+  // Extract company from sender name (e.g., "Syngenta Crop Protection Hiring Team" → "Syngenta Crop Protection")
+  if (company === 'Unknown Company' && sender) {
+    // Pattern: "Company Name Hiring Team" or "Company Name Careers" or "Company Name Recruitment"
+    const senderPatterns = [
+      /^([^<]+?)\s+(Hiring Team|Careers|Recruitment|Recruiting|Talent Acquisition)/i,
+      /^([^<]+?)\s+Team/i,
+      /^([A-Z][a-zA-Z\s&]+?)\s+<[^>]+>$/  // "Company Name <email@domain.com>"
+    ];
+    
+    for (const pattern of senderPatterns) {
+      const match = sender.match(pattern);
+      if (match && match[1]) {
+        const extracted = match[1].trim();
+        // Clean up common suffixes
+        company = extracted.replace(/\s+(Hiring|Careers|Recruitment|Recruiting|Talent|Acquisition|Team)$/i, '').trim();
+        if (company.length > 2 && company.length < 100) {
+          console.log('✅ Enhanced parsing: Extracted company from sender name:', company);
+          break;
+        }
+      }
+    }
+  }
+  
   // If not found in subject, try common companies - prioritize email body over sender
   if (company === 'Unknown Company') {
-    // First check for Wells Fargo specifically (most common issue)
-    if (htmlBody.toLowerCase().includes('wells fargo') || subject.toLowerCase().includes('wells fargo') || sender.toLowerCase().includes('wellsfargo')) {
+    // First check email body for company mentions
+    const bodyLower = htmlBody.toLowerCase();
+    const subjectLower = subject.toLowerCase();
+    
+    // Check for Wells Fargo specifically (most common issue)
+    if (bodyLower.includes('wells fargo') || subjectLower.includes('wells fargo') || sender.toLowerCase().includes('wellsfargo')) {
       company = 'Wells Fargo';
       console.log('✅ Enhanced parsing: Detected Wells Fargo from email content');
     }
+    // Check for Syngenta
+    else if (bodyLower.includes('syngenta') || subjectLower.includes('syngenta') || sender.toLowerCase().includes('syngenta')) {
+      // Extract full company name from body if available
+      const syngentaMatch = htmlBody.match(/Syngenta\s+(?:Crop\s+Protection|Seeds|Agri|Agriculture)?/i);
+      if (syngentaMatch) {
+        company = syngentaMatch[0].trim();
+      } else {
+        company = 'Syngenta';
+      }
+      console.log('✅ Enhanced parsing: Detected Syngenta from email content');
+    }
+    // Check for Martin Marietta
+    else if (bodyLower.includes('martin marietta') || subjectLower.includes('martin marietta') || sender.toLowerCase().includes('martin marietta')) {
+      company = 'Martin Marietta';
+      console.log('✅ Enhanced parsing: Detected Martin Marietta from email content');
+    }
     // Then check for SAS
-    else if (htmlBody.toLowerCase().includes('sas') || subject.toLowerCase().includes('sas') || sender.toLowerCase().includes('sas')) {
+    else if (bodyLower.includes('sas') || subjectLower.includes('sas') || sender.toLowerCase().includes('sas')) {
       company = 'SAS';
       console.log('✅ Enhanced parsing: Detected SAS from email content');
     }
@@ -276,7 +332,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
       
       // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
-        if (htmlBody.toLowerCase().includes(comp.toLowerCase())) {
+        if (bodyLower.includes(comp.toLowerCase())) {
           company = comp;
           break;
         }
@@ -285,7 +341,7 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
       // If still not found, check subject
       if (company === 'Unknown Company') {
         for (const comp of commonCompanies) {
-          if (subject.toLowerCase().includes(comp.toLowerCase())) {
+          if (subjectLower.includes(comp.toLowerCase())) {
             company = comp;
             break;
           }
@@ -295,7 +351,14 @@ function enhancedFallbackParsing(htmlBody, subject, sender) {
       // If still not found, try extracting from sender email domain
       if (company === 'Unknown Company' && sender) {
         const senderLower = sender.toLowerCase();
-        if (senderLower.includes('tiktok')) {
+        // Extract domain from email address
+        const emailMatch = sender.match(/@([^.]+)/);
+        if (emailMatch) {
+          const domain = emailMatch[1];
+          // Capitalize first letter
+          company = domain.charAt(0).toUpperCase() + domain.slice(1);
+          console.log('✅ Enhanced parsing: Extracted company from domain:', company);
+        } else if (senderLower.includes('tiktok')) {
           company = 'TikTok';
         } else if (senderLower.includes('google')) {
           company = 'Google';
@@ -467,9 +530,25 @@ function quickEmailParsing(htmlBody, subject, sender) {
       company = 'Mutual of Omaha';
       console.log('✅ Detected Mutual of Omaha from email content');
     }
+    // Check for Syngenta
+    else if (htmlBody.toLowerCase().includes('syngenta') || subject.toLowerCase().includes('syngenta') || sender.toLowerCase().includes('syngenta')) {
+      // Extract full company name from body if available
+      const syngentaMatch = htmlBody.match(/Syngenta\s+(?:Crop\s+Protection|Seeds|Agri|Agriculture)?/i);
+      if (syngentaMatch) {
+        company = syngentaMatch[0].trim();
+      } else {
+        company = 'Syngenta';
+      }
+      console.log('✅ Detected Syngenta from email content');
+    }
+    // Check for Martin Marietta
+    else if (htmlBody.toLowerCase().includes('martin marietta') || subject.toLowerCase().includes('martin marietta') || sender.toLowerCase().includes('martin marietta')) {
+      company = 'Martin Marietta';
+      console.log('✅ Detected Martin Marietta from email content');
+    }
     // Then check other common companies
     else {
-      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft', 'Old Mission', 'Kenvue', 'Autodesk', 'Cox Enterprises', 'Cox', 'Mutual of Omaha'];
+      const commonCompanies = ['TikTok', 'Google', 'Microsoft', 'Amazon', 'Waymo', 'Illumio', 'Pinterest', 'Riot Games', 'Veeva', 'Zipcar', 'SeatGeek', 'GoFundMe', 'athenahealth', 'Lyft', 'Old Mission', 'Kenvue', 'Autodesk', 'Cox Enterprises', 'Cox', 'Mutual of Omaha', 'Syngenta', 'Martin Marietta'];
       
       // First check email body (higher priority) - handle case insensitive
       for (const comp of commonCompanies) {
@@ -503,6 +582,25 @@ function quickEmailParsing(htmlBody, subject, sender) {
         } else if (senderLower.includes('oldmission')) {
           company = 'Old Mission';
         }
+      }
+    }
+  }
+  
+  // Extract company from sender name if still unknown
+  if (company === 'Unknown Company' && sender) {
+    // Pattern: "Company Name Hiring Team" or "Company Name Careers"
+    const senderNameMatch = sender.match(/^([^<]+?)\s+(Hiring Team|Careers|Recruitment|Recruiting|Talent Acquisition)/i);
+    if (senderNameMatch && senderNameMatch[1]) {
+      company = senderNameMatch[1].trim();
+      console.log('✅ Quick parsing: Extracted company from sender name:', company);
+    } else {
+      // Try extracting from email domain
+      const domainMatch = sender.match(/@([^.]+)/);
+      if (domainMatch) {
+        const domain = domainMatch[1];
+        // Capitalize first letter
+        company = domain.charAt(0).toUpperCase() + domain.slice(1);
+        console.log('✅ Quick parsing: Extracted company from domain:', company);
       }
     }
   }
@@ -568,8 +666,14 @@ function quickEmailParsing(htmlBody, subject, sender) {
   let emailType = 'unknown';
   
   // Check for rejection first (highest priority)
-  if (text.includes('we have decided to pursue another candidate') || 
+  if (text.includes('we have decided to pursue other candidates') || // Martin Marietta pattern
+      text.includes('decided to pursue other candidates') ||
+      text.includes('pursue other candidates for this position') ||
+      text.includes('we have reviewed your resume and have carefully considered') ||
+      text.includes('we have decided to pursue another candidate') || 
       text.includes('decided to pursue another') ||
+      text.includes('we have decided to move forward with other candidates') ||
+      text.includes('decided to move forward with other candidates') ||
       text.includes('not selected to move forward') ||
       text.includes('not selected') || 
       text.includes('unfortunately') ||

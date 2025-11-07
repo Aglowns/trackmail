@@ -85,6 +85,20 @@ class Settings(BaseSettings):
         description="OpenAI API key for AI-powered email classification and parsing (optional)"
     )
     
+    # Stripe Configuration
+    stripe_secret_key: str | None = Field(
+        default=None,
+        description="Stripe secret key for payment processing (required for subscriptions)"
+    )
+    stripe_publishable_key: str | None = Field(
+        default=None,
+        description="Stripe publishable key for frontend checkout (optional, for reference)"
+    )
+    stripe_webhook_secret: str | None = Field(
+        default=None,
+        description="Stripe webhook signing secret for verifying webhook events (required for webhooks)"
+    )
+    
     # Pydantic Settings configuration
     model_config = SettingsConfigDict(
         # Load from .env file

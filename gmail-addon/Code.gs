@@ -31,7 +31,15 @@ function onGmailMessageOpen(e) {
       return buildSignInCard();
     }
     
-    console.log('User authenticated - showing tracking card');
+    console.log('User authenticated - checking subscription status');
+    
+    // Check subscription status
+    const subscription = checkSubscriptionStatus();
+    const autoTrackingEnabled = subscription && 
+                                subscription.features && 
+                                subscription.features.auto_tracking === true;
+    
+    console.log('Auto-tracking enabled:', autoTrackingEnabled);
     
     // User is authenticated - show email tracking card
     const messageId = e.gmail ? e.gmail.messageId : null;
@@ -47,7 +55,25 @@ function onGmailMessageOpen(e) {
           if (messages.length > 0) {
             const currentMessageId = messages[0].getId();
             console.log('Using current message ID:', currentMessageId);
-            return buildTrackingCard(currentMessageId, gmailAccessToken);
+            
+            // If auto-tracking enabled, attempt automatic tracking
+            if (autoTrackingEnabled && gmailAccessToken) {
+              console.log('Auto-tracking enabled, attempting automatic tracking...');
+              const autoTrackResult = attemptAutoTracking(currentMessageId, gmailAccessToken);
+              
+              if (autoTrackResult && autoTrackResult.success === true) {
+                // Auto-tracking successful - show success card
+                console.log('Auto-tracking successful');
+                return buildAutoTrackingSuccessCard(autoTrackResult);
+              } else if (autoTrackResult && autoTrackResult.isJobRelated === false) {
+                // Not job-related - show normal tracking card
+                console.log('Email is not job-related, showing normal card');
+                return buildTrackingCard(currentMessageId, gmailAccessToken, subscription);
+              }
+              // If auto-tracking failed or email not job-related, fall through to normal card
+            }
+            
+            return buildTrackingCard(currentMessageId, gmailAccessToken, subscription);
           }
         }
       } catch (msgError) {
@@ -55,7 +81,24 @@ function onGmailMessageOpen(e) {
       }
     }
     
-    return buildTrackingCard(messageId, gmailAccessToken);
+    // If auto-tracking enabled, attempt automatic tracking
+    if (autoTrackingEnabled && messageId && gmailAccessToken) {
+      console.log('Auto-tracking enabled, attempting automatic tracking...');
+      const autoTrackResult = attemptAutoTracking(messageId, gmailAccessToken);
+      
+      if (autoTrackResult && autoTrackResult.success === true) {
+        // Auto-tracking successful - show success card
+        console.log('Auto-tracking successful');
+        return buildAutoTrackingSuccessCard(autoTrackResult);
+      } else if (autoTrackResult && autoTrackResult.isJobRelated === false) {
+        // Not job-related - show normal tracking card
+        console.log('Email is not job-related, showing normal card');
+        return buildTrackingCard(messageId, gmailAccessToken, subscription);
+      }
+      // If auto-tracking failed, fall through to normal card
+    }
+    
+    return buildTrackingCard(messageId, gmailAccessToken, subscription);
     
   } catch (error) {
     console.error('Error in onGmailMessageOpen:', error);
@@ -112,6 +155,137 @@ function onGmailSettings(e) {
   } catch (error) {
     console.error('Error in onGmailSettings:', error);
     return buildErrorCard('Failed to load settings: ' + error.message);
+  }
+}
+
+/**
+ * Attempt automatic tracking of an email for Pro users.
+ * This function is called automatically when a Pro user opens a job-related email.
+ * 
+ * @param {string} messageId - Gmail message ID
+ * @param {string} accessToken - Gmail API access token
+ * @return {Object} Tracking result with success status
+ */
+function attemptAutoTracking(messageId, accessToken) {
+  console.log('Attempting automatic tracking for message:', messageId);
+  
+  try {
+    // Fetch email data
+    const emailData = fetchEmailData(messageId, accessToken);
+    
+    if (!emailData) {
+      console.log('Failed to fetch email data for auto-tracking');
+      return {
+        success: false,
+        message: 'Failed to fetch email data'
+      };
+    }
+    
+    // Quick check if job-related using lightweight parsing
+    console.log('Quick check if job-related...');
+    let isJobRelated = true;
+    
+    try {
+      // Use quick parsing for fast job-related check
+      const quickParse = quickEmailParsing(emailData.html_body || '', emailData.subject || '', emailData.sender || '');
+      isJobRelated = quickParse.isJobRelated !== false;
+      
+      if (!isJobRelated) {
+        console.log('Email is not job-related, skipping auto-tracking');
+        return {
+          success: false,
+          isJobRelated: false,
+          message: 'Email is not job-related'
+        };
+      }
+    } catch (parseError) {
+      console.error('Error in quick parse check:', parseError);
+      // Continue with tracking if parsing fails (better to track than miss)
+    }
+    
+    // Use advanced AI parsing for accurate data extraction
+    console.log('Using advanced AI parsing for auto-tracking...');
+    const parsedData = ultraAccurateEmailParsing(
+      emailData.html_body || '', 
+      emailData.subject || '', 
+      emailData.sender || ''
+    );
+    
+    // Detect application status
+    const statusDetection = detectJobApplicationStatus(
+      emailData.html_body || '', 
+      emailData.subject || '', 
+      emailData.sender || '', 
+      parsedData.company || '', 
+      parsedData.position || ''
+    );
+    
+    // Add parsed data to emailData
+    emailData.parsed_company = parsedData.company;
+    emailData.parsed_position = parsedData.position;
+    emailData.parsed_email_type = parsedData.emailType;
+    emailData.parsed_confidence = parsedData.confidence;
+    emailData.parsed_job_url = normalizeJobUrl(
+      parsedData.jobUrl || parsedData.job_url || parsedData.jobURL
+    );
+    
+    // Add status detection data
+    emailData.detected_status = statusDetection.status;
+    emailData.status_confidence = statusDetection.confidence;
+    emailData.status_indicators = statusDetection.indicators;
+    emailData.status_reasoning = statusDetection.reasoning;
+    emailData.is_job_related = statusDetection.isJobRelated;
+    emailData.urgency = statusDetection.urgency;
+    
+    // Skip if not job-related after full analysis
+    if (statusDetection.isJobRelated === false || statusDetection.status === 'not_job_related') {
+      console.log('Email is not job-related after full analysis');
+      return {
+        success: false,
+        isJobRelated: false,
+        message: 'Email is not job-related'
+      };
+    }
+    
+    // Call ingestEmail automatically
+    console.log('Calling ingestEmail for auto-tracking...');
+    const result = ingestEmail(emailData);
+    
+    console.log('Auto-tracking result:', JSON.stringify(result));
+    
+    if (result && result.success === true) {
+      return {
+        success: true,
+        message: result.message || 'Application tracked automatically',
+        application_id: result.application_id,
+        duplicate: result.duplicate || false,
+        isJobRelated: true
+      };
+    } else {
+      // Check if it's a limit exceeded error
+      if (result && result.detail && result.detail.error === 'limit_exceeded') {
+        return {
+          success: false,
+          error: 'limit_exceeded',
+          errorDetails: result.detail,
+          message: result.detail.message || 'Application limit reached'
+        };
+      }
+      
+      return {
+        success: false,
+        message: result ? (result.message || 'Failed to track application') : 'No response from server',
+        isJobRelated: true
+      };
+    }
+    
+  } catch (error) {
+    console.error('Error in attemptAutoTracking:', error);
+    return {
+      success: false,
+      message: error.message || 'Failed to auto-track email',
+      error: error.toString()
+    };
   }
 }
 
@@ -216,6 +390,25 @@ function trackApplicationAction(e) {
     const result = ingestEmail(emailData);
     
     console.log('Ingest result:', JSON.stringify(result));
+    
+    // Check for limit_exceeded error (multiple possible error formats)
+    const limitError = result && (
+      (result.detail && result.detail.error === 'limit_exceeded') ||
+      (result.error === 'limit_exceeded') ||
+      (result.error_type === 'limit_exceeded')
+    );
+    
+    if (limitError) {
+      console.log('Application limit exceeded - showing upgrade card');
+      const errorDetails = result.detail || result;
+      return CardService.newActionResponseBuilder()
+        .setNavigation(
+          CardService.newNavigation().updateCard(
+            buildUpgradeCard(errorDetails)
+          )
+        )
+        .build();
+    }
     
     // Check if result is valid and has success property
     if (result && result.success === true) {
@@ -563,6 +756,30 @@ function openAuthPageAction(e) {
         .setUrl(authUrl)
         .setOpenAs(CardService.OpenAs.FULL_SIZE)
         .setOnClose(CardService.OnClose.RELOAD)
+    )
+    .build();
+}
+
+/**
+ * Action handler for opening the upgrade page.
+ * This is called when the user clicks "Upgrade to Pro" button.
+ * 
+ * @param {Object} e - Event object
+ * @return {ActionResponse} Opens upgrade page in new window
+ */
+function openUpgradePageAction(e) {
+  console.log('openUpgradePageAction triggered');
+  
+  // Get the frontend URL from config
+  const frontendUrl = 'https://jobmail-frontend.vercel.app';
+  const upgradeUrl = frontendUrl + '/subscription?upgrade=true';
+  
+  return CardService.newActionResponseBuilder()
+    .setOpenLink(
+      CardService.newOpenLink()
+        .setUrl(upgradeUrl)
+        .setOpenAs(CardService.OpenAs.FULL_SIZE)
+        .setOnClose(CardService.OnClose.NOTHING)
     )
     .build();
 }

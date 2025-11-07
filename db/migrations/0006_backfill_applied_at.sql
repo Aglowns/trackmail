@@ -21,3 +21,8 @@ WHERE app.applied_at IS NULL;
 
 COMMIT;
 
+
+
+
+
+

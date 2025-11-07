@@ -72,6 +72,89 @@ function ingestEmail(emailData) {
       };
     }
     
+    // Check if it's a 403 Forbidden (limit exceeded) error
+    if ((apiError && apiError.status === 403) || error.message.includes('403') || error.message.includes('limit_exceeded')) {
+      // Try to extract limit_exceeded error details
+      let limitError = null;
+      
+      // First, check if detail is already a structured object
+      if (apiError && apiError.detail && typeof apiError.detail === 'object') {
+        if (apiError.detail.error === 'limit_exceeded') {
+          limitError = apiError.detail;
+        }
+      }
+      
+      // If not found, try parsing from raw response
+      if (!limitError && apiError && apiError.raw) {
+        try {
+          const rawJson = JSON.parse(apiError.raw);
+          if (rawJson.detail && typeof rawJson.detail === 'object' && rawJson.detail.error === 'limit_exceeded') {
+            limitError = rawJson.detail;
+          } else if (rawJson.detail && typeof rawJson.detail === 'string') {
+            // Try to parse detail string that might contain JSON
+            try {
+              const detailObj = JSON.parse(rawJson.detail);
+              if (detailObj.error === 'limit_exceeded') {
+                limitError = detailObj;
+              }
+            } catch (e) {
+              // Check if detail string contains limit_exceeded info
+              if (rawJson.detail.includes('limit_exceeded')) {
+                // Try to extract structured data from string representation
+                const errorMatch = rawJson.detail.match(/\{'error':\s*'limit_exceeded'[^}]*\}/);
+                if (errorMatch) {
+                  try {
+                    // Convert Python dict format to JSON
+                    const jsonStr = errorMatch[0].replace(/'/g, '"').replace(/True/g, 'true').replace(/False/g, 'false');
+                    limitError = JSON.parse(jsonStr);
+                  } catch (e2) {
+                    // Fallback: extract fields using regex
+                    limitError = {
+                      error: 'limit_exceeded',
+                      message: rawJson.detail.match(/message['"]:\s*['"]([^'"]+)['"]/)?.[1] || "You've reached your application limit",
+                      upgrade_required: true,
+                      current_count: parseInt(rawJson.detail.match(/current_count['"]:\s*(\d+)/)?.[1] || '25'),
+                      limit: parseInt(rawJson.detail.match(/limit['"]:\s*(\d+)/)?.[1] || '25')
+                    };
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {
+          // If parsing fails, check error message for limit_exceeded
+          if (error.message.includes('limit_exceeded')) {
+            const msg = error.message;
+            limitError = {
+              error: 'limit_exceeded',
+              message: msg.match(/message['"]:\s*['"]([^'"]+)['"]/)?.[1] || "You've reached your application limit",
+              upgrade_required: true,
+              current_count: parseInt(msg.match(/current_count['"]:\s*(\d+)/)?.[1] || '25'),
+              limit: parseInt(msg.match(/limit['"]:\s*(\d+)/)?.[1] || '25')
+            };
+          }
+        }
+      }
+      
+      if (limitError) {
+        return {
+          success: false,
+          error: 'limit_exceeded',
+          error_type: 'limit_exceeded',
+          detail: limitError,
+          message: limitError.message || "You've reached your application limit"
+        };
+      }
+      
+      // Regular 403 error
+      return {
+        success: false,
+        message: apiError ? (apiError.message || 'Access forbidden') : 'Access forbidden',
+        error_type: 'forbidden',
+        detail: apiError ? (apiError.detail || apiError.raw) : error.message
+      };
+    }
+    
     // Check if it's a 500 server error
     if ((apiError && apiError.status === 500) || error.message.includes('500') || error.message.includes('Server error')) {
       // Extract the actual backend error message from the raw response
@@ -379,6 +462,40 @@ function checkBackendHealth() {
     return {
       status: 'unreachable',
       error: error.message
+    };
+  }
+}
+
+/**
+ * Check subscription status for the current user.
+ * 
+ * @return {Object} Subscription status with plan details and features
+ */
+function checkSubscriptionStatus() {
+  try {
+    console.log('Checking subscription status...');
+    
+    const response = makeAuthenticatedRequest('/subscription/status', {
+      method: 'get'
+    });
+    
+    console.log('Subscription status:', JSON.stringify(response));
+    return response;
+    
+  } catch (error) {
+    console.error('Error checking subscription status:', error);
+    
+    // Return default free tier on error
+    return {
+      plan: 'free',
+      features: {
+        max_applications: 25,
+        auto_tracking: false,
+        unlimited_applications: false,
+        advanced_analytics: false,
+        export_data: false
+      },
+      error: error.message || 'Failed to check subscription status'
     };
   }
 }

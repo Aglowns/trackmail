@@ -15,7 +15,7 @@ Row-Level Security ensures users only access their own data.
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import StreamingResponse
 
-from app.deps import CurrentUserId, FilterParams, PaginationParams
+from app.deps import CurrentUserId, FilterParams, PaginationParams, require_feature
 from app.schemas import (
     ApplicationCreate,
     ApplicationResponse,
@@ -131,10 +131,14 @@ async def applications_by_status(user_id: CurrentUserId) -> dict[str, list[dict]
 
 @router.get("/export")
 async def export_applications(
-    user_id: CurrentUserId,
+    user_id: str = Depends(require_feature("export_data")),
     filters: FilterParams = Depends(),
 ) -> StreamingResponse:
-    """Export applications as CSV respecting current filters."""
+    """
+    Export applications as CSV respecting current filters.
+    
+    Requires Pro subscription with export_data feature.
+    """
     csv_data = await app_service.export_applications_to_csv(
         user_id=user_id,
         status=filters.status,
@@ -156,29 +160,51 @@ async def export_applications(
 
 
 @router.get("/analytics/overview")
-async def get_analytics_overview(user_id: CurrentUserId) -> dict:
-    """Get analytics overview data for dashboard."""
+async def get_analytics_overview(
+    user_id: str = Depends(require_feature("advanced_analytics"))
+) -> dict:
+    """
+    Get analytics overview data for dashboard.
+    
+    Requires Pro subscription with advanced_analytics feature.
+    """
     return await app_service.get_analytics_overview(user_id)
 
 
 @router.get("/analytics/trends")
 async def get_analytics_trends(
-    user_id: CurrentUserId,
+    user_id: str = Depends(require_feature("advanced_analytics")),
     days: int = 30
 ) -> dict:
-    """Get application trends over time."""
+    """
+    Get application trends over time.
+    
+    Requires Pro subscription with advanced_analytics feature.
+    """
     return await app_service.get_analytics_trends(user_id, days)
 
 
 @router.get("/analytics/companies")
-async def get_analytics_companies(user_id: CurrentUserId) -> dict:
-    """Get company analytics data."""
+async def get_analytics_companies(
+    user_id: str = Depends(require_feature("advanced_analytics"))
+) -> dict:
+    """
+    Get company analytics data.
+    
+    Requires Pro subscription with advanced_analytics feature.
+    """
     return await app_service.get_analytics_companies(user_id)
 
 
 @router.get("/analytics/sources")
-async def get_analytics_sources(user_id: CurrentUserId) -> dict:
-    """Get application source analytics."""
+async def get_analytics_sources(
+    user_id: str = Depends(require_feature("advanced_analytics"))
+) -> dict:
+    """
+    Get application source analytics.
+    
+    Requires Pro subscription with advanced_analytics feature.
+    """
     return await app_service.get_analytics_sources(user_id)
 
 

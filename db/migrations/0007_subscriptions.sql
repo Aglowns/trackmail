@@ -72,7 +72,6 @@ INSERT INTO subscription_plans (
         "max_applications": 25,
         "auto_tracking": false,
         "unlimited_applications": false,
-        "resume_tailoring": false,
         "advanced_analytics": false,
         "export_data": false
     }'
@@ -91,7 +90,6 @@ INSERT INTO subscription_plans (
         "max_applications": null,
         "auto_tracking": true,
         "unlimited_applications": true,
-        "resume_tailoring": true,
         "advanced_analytics": true,
         "export_data": true
     }'
