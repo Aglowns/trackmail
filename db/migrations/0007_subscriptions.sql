@@ -84,8 +84,8 @@ INSERT INTO subscription_plans (
     'pro',
     'Pro',
     'Unlimited applications with AI-powered automation',
-    9.99,
-    99.99,
+    2.99,
+    29.99,
     '{
         "max_applications": null,
         "auto_tracking": true,

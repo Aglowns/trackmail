@@ -138,7 +138,7 @@ async def get_advanced_analytics(
 | **Advanced Analytics** | ✗ | ✓ |
 | **Data Export** | ✗ | ✓ |
 | **Priority Support** | ✗ | ✓ |
-| **Price** | Free | $9.99/month or $99/year |
+| **Price** | Free | $2.99/month or $29.99/year |
 
 ---
 

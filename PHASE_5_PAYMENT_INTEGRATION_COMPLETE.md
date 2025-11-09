@@ -143,7 +143,7 @@ Response:
   "checkout_url": "https://checkout.stripe.com/...",
   "session_id": "cs_test_...",
   "plan": "Pro",
-  "price": 9.99,
+  "price": 2.99,
   "billing_period": "monthly"
 }
 ```

@@ -98,10 +98,10 @@ FRONTEND_URL=https://your-frontend.vercel.app  # Optional, defaults to jobmail-f
 3. **Description:** "Unlimited applications with AI-powered automation"
 4. **Pricing:**
    - **Recurring:** Monthly
-   - **Price:** $9.99 USD
+   - **Price:** $2.99 USD
    - Click **"Add another price"**
    - **Recurring:** Yearly
-   - **Price:** $99.99 USD
+   - **Price:** $29.99 USD
 5. Save the **Price IDs** (start with `price_...`)
 
 ### Option B: Use Code (Optional)

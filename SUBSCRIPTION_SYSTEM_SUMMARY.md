@@ -69,7 +69,7 @@ A comprehensive **two-tier subscription system** (Free/Pro) with:
 - ✅ Advanced analytics
 - ✅ Data export (CSV/JSON)
 - ✅ Priority support
-- 💰 $9.99/month or $99/year
+- 💰 $2.99/month or $29.99/year
 
 ---
 
