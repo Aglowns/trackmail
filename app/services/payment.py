@@ -129,6 +129,13 @@ class PaymentService:
                 success_url=f"{os.getenv('FRONTEND_URL', 'https://jobmail-frontend.vercel.app')}/subscription?success=true&session_id={{CHECKOUT_SESSION_ID}}",
                 cancel_url=f"{os.getenv('FRONTEND_URL', 'https://jobmail-frontend.vercel.app')}/subscription?canceled=true",
                 client_reference_id=user_id,
+                subscription_data={
+                    "metadata": {
+                        "user_id": user_id,
+                        "plan_id": plan_id,
+                    }
+                },
+                customer_creation="always",
                 metadata={
                     "user_id": user_id,
                     "plan_id": plan_id,
@@ -186,18 +193,43 @@ class PaymentService:
     
     async def _handle_checkout_completed(self, session: Dict[str, Any]):
         """Handle checkout.session.completed event."""
-        user_id = session.get("metadata", {}).get("user_id") or session.get("client_reference_id")
+        # Try multiple ways to get user_id
+        user_id = (
+            session.get("metadata", {}).get("user_id") or 
+            session.get("client_reference_id")
+        )
         plan_id = session.get("metadata", {}).get("plan_id")
         
-        if not user_id or not plan_id:
-            print(f"Missing user_id or plan_id in checkout session: {session.id}")
+        if not user_id:
+            print(f"WARNING: Missing user_id in checkout session {session.get('id')}")
+            print(f"Session metadata: {session.get('metadata')}")
+            print(f"Client reference ID: {session.get('client_reference_id')}")
             return
+        
+        if not plan_id:
+            print(f"WARNING: Missing plan_id in checkout session {session.get('id')}, defaulting to 'pro'")
+            # Default to pro plan if not specified
+            plan = await self.subscription_service.get_subscription_plan("pro")
+            if plan:
+                plan_id = plan.get("id")
         
         # Get subscription from Stripe
         subscription_id = session.get("subscription")
         if subscription_id:
             subscription = stripe.Subscription.retrieve(subscription_id)
+            
+            # Ensure subscription has the user_id in metadata
+            if not subscription.get("metadata", {}).get("user_id"):
+                print(f"Updating subscription {subscription_id} with user_id metadata")
+                stripe.Subscription.modify(
+                    subscription_id,
+                    metadata={"user_id": user_id, "plan_id": plan_id}
+                )
+                subscription = stripe.Subscription.retrieve(subscription_id)
+            
             await self.update_subscription_from_stripe(subscription)
+        else:
+            print(f"WARNING: No subscription_id found in checkout session {session.get('id')}")
     
     async def _handle_subscription_created(self, subscription: Dict[str, Any]):
         """Handle customer.subscription.created event."""
@@ -239,11 +271,18 @@ class PaymentService:
         Returns:
             Updated subscription record
         """
-        customer_id = stripe_subscription.get("customer")
-        user_id = await self._get_user_id_from_customer(customer_id)
+        # Try to get user_id from subscription metadata first
+        user_id = stripe_subscription.get("metadata", {}).get("user_id")
+        
+        # If not in metadata, try to get from customer
+        if not user_id:
+            customer_id = stripe_subscription.get("customer")
+            user_id = await self._get_user_id_from_customer(customer_id)
         
         if not user_id:
+            customer_id = stripe_subscription.get("customer")
             print(f"Could not find user_id for Stripe customer: {customer_id}")
+            print(f"Subscription metadata: {stripe_subscription.get('metadata')}")
             return {}
         
         # Extract subscription details
