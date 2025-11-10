@@ -111,7 +111,17 @@ class EmailParser:
                     body=email_data.text_body or ""
                 )
                 if ai_result is not None:
-                    return ai_result.get("is_job_application", False)
+                    ai_decision = ai_result.get("is_job_application", False)
+                    if ai_decision is True:
+                        return True
+                    # If the AI says "not a job application", fall through and allow
+                    # the keyword-based detector to make the final call. This handles
+                    # cases where the AI is overly strict with rejections.
+                    print(
+                        "⚠️ AI marked email as non-job-application, "
+                        "falling back to keyword heuristics. Reasoning:",
+                        ai_result.get("reasoning", "N/A")
+                    )
             except Exception as e:
                 print(f"⚠️ AI detection failed, falling back to keyword matching: {e}")
         
@@ -130,7 +140,10 @@ class EmailParser:
         # Also check for rejection keywords to ensure we catch rejections
         rejection_keywords = [
             'not selected', 'decided to go with another candidate',
-            'unfortunately', 'not moving forward', 'not the right fit'
+            'unfortunately', 'not moving forward', 'not the right fit',
+            'have not been selected', 'not been selected',
+            'not been selected for this year', 'will not be moving forward',
+            'we will not be moving forward', 'you have not been selected'
         ]
         
         has_job_keywords = any(keyword in content for keyword in job_keywords)
