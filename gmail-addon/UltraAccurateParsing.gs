@@ -674,6 +674,9 @@ function quickEmailParsing(htmlBody, subject, sender) {
       text.includes('decided to pursue another') ||
       text.includes('we have decided to move forward with other candidates') ||
       text.includes('decided to move forward with other candidates') ||
+      text.includes('decided to progress with other candidates') ||
+      text.includes('we have decided to progress with other candidates') ||
+      text.includes('progress with other candidates') ||
       text.includes('not selected to move forward') ||
       text.includes('not selected') || 
       text.includes('unfortunately') ||
