@@ -1,0 +1,14 @@
+QUICK PUSH COMMANDS - Copy/Paste into PowerShell
+==================================================
+
+cd C:\Users\aglon\Desktop\CURSOR\trackmail
+git rm FIX_STRIPE_503_ERROR.md
+git add db/migrations/0007_subscriptions.sql db/migrations/0010_update_pro_pricing.sql COMPLETE_SUBSCRIPTION_SYSTEM.md SUBSCRIPTION_SYSTEM_SUMMARY.md ALL_PHASES_COMPLETE.md PHASE_6_FRONTEND_COMPLETE.md STRIPE_SETUP_GUIDE.md
+git commit --amend -m "Update Pro plan pricing to $2.99/month and $29.99/year"
+git push origin main --force-with-lease
+
+cd jobmail-frontend
+git add src/app/page.tsx
+git commit -m "Update pricing to $2.99/month"
+git push origin main
+
