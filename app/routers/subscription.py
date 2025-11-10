@@ -13,7 +13,7 @@ from typing import Dict, Any
 from fastapi import APIRouter, HTTPException, Request, status, Header
 from fastapi.responses import Response
 
-from app.deps import CurrentUserId
+from app.deps import FlexibleUserId
 from app.services.subscription import get_subscription_service
 from app.services.payment import get_payment_service
 from app.config import settings
@@ -23,7 +23,7 @@ router = APIRouter(prefix="/subscription", tags=["Subscription"])
 
 
 @router.get("/status")
-async def get_subscription_status(user_id: CurrentUserId) -> Dict[str, Any]:
+async def get_subscription_status(user_id: FlexibleUserId) -> Dict[str, Any]:
     """Return the current user's subscription status and usage."""
     service = get_subscription_service()
 
@@ -58,7 +58,7 @@ async def get_subscription_status(user_id: CurrentUserId) -> Dict[str, Any]:
 
 
 @router.get("/plans")
-async def list_subscription_plans() -> Dict[str, Any]:
+async def list_subscription_plans(user_id: FlexibleUserId) -> Dict[str, Any]:
     """Return all active subscription plans."""
     service = get_subscription_service()
 
@@ -76,7 +76,7 @@ async def list_subscription_plans() -> Dict[str, Any]:
 
 @router.post("/upgrade")
 async def create_upgrade_checkout(
-    user_id: CurrentUserId,
+    user_id: FlexibleUserId,
     plan_name: str = "pro",
     billing_period: str = "monthly",
 ) -> Dict[str, Any]:
