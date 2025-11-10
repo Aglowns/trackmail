@@ -293,7 +293,10 @@ function fallbackStatusDetection(htmlBody, subject, sender, company = null, posi
         'not advance to the next stage',
         'better match the qualifications', // Often appears with rejections
         'we have reviewed your resume and have carefully considered', // Martin Marietta pattern
-        'decided to pursue other candidates for this position' // Full Martin Marietta phrase
+        'decided to pursue other candidates for this position', // Full Martin Marietta phrase
+        'you have not been selected', 'not been selected', 'have not been selected for',
+        'will not be moving forward with your application', 'unfortunately you have not been selected',
+        'not selected for this year', 'we will not be moving forward'
       ],
       confidence: 95
     },
