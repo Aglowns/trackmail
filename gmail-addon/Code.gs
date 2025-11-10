@@ -1,4 +1,45 @@
 /**
+ * Known newsletter/digest senders that should not trigger auto tracking.
+ */
+const NEWSLETTER_SENDERS = [
+  '@handshake.com',
+  'handshake@',
+  '@mail.googlejobs.com',
+  '@mail.handshake.com',
+  '@updates.handshake.com',
+  '@jobcase.com',
+  '@ziprecruiter.com',
+  '@glassdoor.com',
+  '@simplyhired.com',
+  '@careerbuilder.com',
+];
+
+const NEWSLETTER_SUBJECT_TOKENS = [
+  'recommended jobs for you',
+  'jobs you may like',
+  'new roles from',
+  'roles hiring now',
+  'job digest',
+  'recommended opportunities',
+  'top matches this week',
+];
+
+function isNewsletterEmail(sender, subject) {
+  const normalizedSender = (sender || '').toLowerCase();
+  const normalizedSubject = (subject || '').toLowerCase();
+
+  if (NEWSLETTER_SENDERS.some((token) => normalizedSender.includes(token))) {
+    return true;
+  }
+
+  if (NEWSLETTER_SUBJECT_TOKENS.some((token) => normalizedSubject.includes(token))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * JobMail Gmail Add-on
  * 
  * Main entry points and trigger functions for the Gmail Add-on.
@@ -181,6 +222,15 @@ function attemptAutoTracking(messageId, accessToken) {
       };
     }
     
+    if (isNewsletterEmail(emailData.sender, emailData.subject)) {
+      console.log('Newsletter or digest detected, skipping auto-tracking.');
+      return {
+        success: false,
+        isJobRelated: false,
+        message: 'Newsletter detected',
+      };
+    }
+
     // Quick check if job-related using lightweight parsing
     console.log('Quick check if job-related...');
     let isJobRelated = true;
@@ -313,6 +363,41 @@ function trackApplicationAction(e) {
     
     if (!emailData) {
       throw new Error('Failed to fetch email data');
+    }
+
+    if (isNewsletterEmail(emailData.sender, emailData.subject)) {
+      console.log('Newsletter/digest detected during manual tracking, showing not job card.');
+      return CardService.newActionResponseBuilder()
+        .setNavigation(
+          CardService.newNavigation().updateCard(
+            CardService.newCardBuilder()
+              .setHeader(
+                CardService.newCardHeader()
+                  .setTitle('📧 JobMail')
+                  .setSubtitle('Not Job Related')
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextParagraph()
+                      .setText('<font color="#6b7280">This looks like a newsletter or job recommendations digest. Only actual application updates, interviews, offers, or rejections are tracked.</font>')
+                  )
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextButton()
+                      .setText('← Back')
+                      .setOnClickAction(
+                        CardService.newAction()
+                          .setFunctionName('onGmailMessageOpen')
+                      )
+                  )
+              )
+              .build()
+          )
+        )
+        .build();
     }
     
     // Parse email data using advanced AI parsing for accurate results
@@ -661,6 +746,41 @@ function testParsingAction(e) {
     
     if (!emailData) {
       throw new Error('Failed to fetch email data');
+    }
+
+    if (isNewsletterEmail(emailData.sender, emailData.subject)) {
+      console.log('Newsletter/digest detected during test parsing, short-circuiting.');
+      return CardService.newActionResponseBuilder()
+        .setNavigation(
+          CardService.newNavigation().updateCard(
+            CardService.newCardBuilder()
+              .setHeader(
+                CardService.newCardHeader()
+                  .setTitle('📧 JobMail')
+                  .setSubtitle('Digest Email Detected')
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextParagraph()
+                      .setText('<font color="#6b7280">This appears to be a job recommendations digest. JobMail ignores newsletters to stay focused on actual applications.</font>')
+                  )
+              )
+              .addSection(
+                CardService.newCardSection()
+                  .addWidget(
+                    CardService.newTextButton()
+                      .setText('← Back')
+                      .setOnClickAction(
+                        CardService.newAction()
+                          .setFunctionName('onGmailMessageOpen')
+                      )
+                  )
+              )
+              .build()
+          )
+        )
+        .build();
     }
     
     // Test parsing using advanced AI parsing locally

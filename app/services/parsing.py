@@ -125,6 +125,35 @@ class EmailParser:
             except Exception as e:
                 print(f"⚠️ AI detection failed, falling back to keyword matching: {e}")
         
+        # Quick exclusion for newsletters / digests to avoid timeouts
+        subject = (email_data.subject or "").lower()
+        sender = (email_data.sender or "").lower()
+        newsletter_senders = {
+            "handshake@",  # Handshake digests
+            "@mail.googlejobs.com",
+            "@mail.handshake.com",
+            "@updates.handshake.com",
+            "@mail.linkedin.com",
+            "@jobcase.com",
+            "@jobs.com",
+            "@ziprecruiter.com",
+        }
+        newsletter_subject_tokens = [
+            "recommended jobs for you",
+            "jobs you may like",
+            "new roles from",
+            "weekly job digest",
+            "job recommendations",
+            "roles hiring now",
+            "popular positions this week",
+            "new matches for you",
+        ]
+        if any(token in sender for token in newsletter_senders) or any(
+            token in subject for token in newsletter_subject_tokens
+        ):
+            print("ℹ️ Newsletter/digest detected, skipping job classification.")
+            return False
+
         # Fallback to keyword-based detection
         content = (email_data.subject + " " + (email_data.text_body or "")).lower()
         
@@ -143,7 +172,12 @@ class EmailParser:
             'unfortunately', 'not moving forward', 'not the right fit',
             'have not been selected', 'not been selected',
             'not been selected for this year', 'will not be moving forward',
-            'we will not be moving forward', 'you have not been selected'
+            'we will not be moving forward', 'you have not been selected',
+            'decided to progress with other candidates',
+            'progress with other candidates',
+            'could not move forward with your application',
+            'decision regarding your application',
+            'keep in touch regarding future opportunities',
         ]
         
         has_job_keywords = any(keyword in content for keyword in job_keywords)
