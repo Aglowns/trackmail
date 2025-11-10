@@ -359,6 +359,7 @@ async def get_user_applications(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     search: Optional[str] = None,
+    sort: Optional[str] = None,
 ) -> tuple[list[dict], int]:
     """
     Get applications for a user with filtering and pagination.
@@ -388,9 +389,19 @@ async def get_user_applications(
     if date_to:
         query = query.lte("applied_at", date_to)
 
-    query = query.range(skip, skip + limit - 1).order("order_index", desc=False).order(
-        "updated_at", desc=True
-    )
+    # Apply ordering logic
+    sort_value = (sort or "updated_desc").lower()
+
+    query = query.range(skip, skip + limit - 1).order("order_index", desc=False)
+
+    if sort_value == "applied_desc":
+        # Use applied_at when available, fall back to created_at to keep deterministic order
+        query = query.order("applied_at", desc=True, nullsfirst=False).order(
+            "created_at", desc=True
+        )
+    else:
+        # Default: most recently updated first, fall back to created_at
+        query = query.order("updated_at", desc=True).order("created_at", desc=True)
 
     result = query.execute()
     total = result.count if result.count is not None else 0
@@ -427,6 +438,7 @@ async def export_applications_to_csv(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     search: Optional[str] = None,
+    sort: Optional[str] = None,
 ) -> str:
     """Export filtered applications as CSV."""
     applications, _ = await get_user_applications(
@@ -441,6 +453,7 @@ async def export_applications_to_csv(
         date_from=date_from,
         date_to=date_to,
         search=search,
+        sort=sort,
     )
 
     to_iso = lambda value: value.split("T")[0] if isinstance(value, str) and "T" in value else value

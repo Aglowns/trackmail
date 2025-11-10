@@ -71,6 +71,7 @@ async def list_applications(
         date_from=filters.date_from,
         date_to=filters.date_to,
         search=filters.search,
+        sort=filters.sort,
     )
     
     return PaginatedResponse(
@@ -149,6 +150,7 @@ async def export_applications(
         date_from=filters.date_from,
         date_to=filters.date_to,
         search=filters.search,
+        sort=filters.sort,
     )
     return StreamingResponse(
         iter([csv_data]),

@@ -60,6 +60,8 @@ async def get_subscription_status(user_id: FlexibleUserId) -> Dict[str, Any]:
 @router.get("/plans")
 async def list_subscription_plans(user_id: FlexibleUserId) -> Dict[str, Any]:
     """Return all active subscription plans."""
+    # user_id is only used to enforce authentication; actual value not needed here.
+    _ = user_id
     service = get_subscription_service()
 
     try:

@@ -119,6 +119,13 @@ class FilterParams:
             str | None,
             Query(description="Search company or position")
         ] = None,
+        sort: Annotated[
+            str | None,
+            Query(
+                description="Sort order (updated_desc or applied_desc)",
+                pattern="^(updated_desc|applied_desc)$"
+            )
+        ] = None,
     ):
         self.status = status
         self.company = company
@@ -128,6 +135,7 @@ class FilterParams:
         self.date_from = date_from
         self.date_to = date_to
         self.search = search
+        self.sort = sort
 
 
 # Dependency examples for future use:
