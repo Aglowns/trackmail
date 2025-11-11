@@ -164,6 +164,14 @@ function buildTrackingCard(messageId, accessToken, subscription) {
     );
     isJobRelated = parsingResults.isJobRelated !== false && emailType !== 'not_job_related';
     
+    // CRITICAL: Force isJobRelated = true if emailType is a recognized job status
+    // This prevents false negatives when the AI parser incorrectly marks job emails as not job-related
+    const recognizedJobStatuses = ['rejected', 'rejection', 'interview_scheduled', 'interview', 'offer_received', 'offer', 'applied', 'new_application', 'follow_up'];
+    if (recognizedJobStatuses.includes(emailType)) {
+      console.log('✅ Forcing isJobRelated = true because emailType is:', emailType);
+      isJobRelated = true;
+    }
+    
     // Build email preview with accurate classification
     let emailTypeIcon = '📧';
     let emailTypeText = 'Job Application';

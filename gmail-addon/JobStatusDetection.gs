@@ -76,6 +76,7 @@ function normalizeStatusForJobListings(result, htmlBody, subject, sender) {
   // These are legitimate job application emails, not job listings
   const jobApplicationPhrases = [
     'decided to pursue other candidates',
+    'decided to progress with other candidates',
     'decided to move forward with other candidates',
     'not selected',
     'unfortunately',
