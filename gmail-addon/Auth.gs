@@ -21,6 +21,9 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 // Storage keys
 const API_KEY_KEY = 'jobmail_api_key';  // Simple API key (never expires)
 const USER_EMAIL_KEY = 'jobmail_user_email';
+const AUTO_TRACK_ENABLED_KEY = 'jobmail_auto_track_enabled';
+const AI_CONSENT_KEY = 'jobmail_ai_consent';
+const PARSING_MODE_KEY = 'jobmail_parsing_mode';
 
 /**
  * Get the frontend login URL where users can sign in.
@@ -103,6 +106,45 @@ function clearSessionHandle() {
   userProperties.deleteProperty(USER_EMAIL_KEY);
   
   console.log('✅ API key cleared - user needs to paste a new one');
+}
+
+/**
+ * Get persisted user preferences with defaults applied.
+ *
+ * @return {Object} Preference map
+ */
+function getUserPreferences() {
+  const userProperties = PropertiesService.getUserProperties();
+  const autoTrackValue = userProperties.getProperty(AUTO_TRACK_ENABLED_KEY);
+  const aiConsentValue = userProperties.getProperty(AI_CONSENT_KEY);
+  const parsingModeValue = userProperties.getProperty(PARSING_MODE_KEY);
+
+  return {
+    autoTrack: autoTrackValue === null ? true : autoTrackValue === 'true',
+    aiConsent: aiConsentValue === 'true',
+    parsingMode: parsingModeValue || 'quick'
+  };
+}
+
+/**
+ * Persist user preferences.
+ *
+ * @param {Object} preferences - Preference map
+ */
+function saveUserPreferences(preferences) {
+  const userProperties = PropertiesService.getUserProperties();
+
+  if (preferences && typeof preferences.autoTrack !== 'undefined') {
+    userProperties.setProperty(AUTO_TRACK_ENABLED_KEY, String(!!preferences.autoTrack));
+  }
+
+  if (preferences && typeof preferences.aiConsent !== 'undefined') {
+    userProperties.setProperty(AI_CONSENT_KEY, String(!!preferences.aiConsent));
+  }
+
+  if (preferences && preferences.parsingMode) {
+    userProperties.setProperty(PARSING_MODE_KEY, preferences.parsingMode);
+  }
 }
 
 /**
@@ -502,7 +544,10 @@ function makeAuthenticatedRequest(endpoint, options) {
         'X-API-Key': apiKey,  // Simple header - no Bearer token needed!
         'Content-Type': 'application/json'
       },
-      muteHttpExceptions: true
+      muteHttpExceptions: true,
+      // Add timeout to prevent hanging requests (30 seconds)
+      'followRedirects': true,
+      'validateHttpsCertificates': true
     };
 
     // Add payload if provided

@@ -468,22 +468,60 @@ function checkBackendHealth() {
 
 /**
  * Check subscription status for the current user.
+ * Uses caching to avoid repeated API calls (cached for 5 minutes).
  * 
  * @return {Object} Subscription status with plan details and features
  */
 function checkSubscriptionStatus() {
+  const CACHE_KEY = 'subscription_status_cache';
+  const CACHE_EXPIRY_KEY = 'subscription_status_cache_expiry';
+  const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
+  
   try {
-    console.log('Checking subscription status...');
+    const userProperties = PropertiesService.getUserProperties();
+    const cached = userProperties.getProperty(CACHE_KEY);
+    const cacheExpiry = userProperties.getProperty(CACHE_EXPIRY_KEY);
+    
+    // Return cached data if still valid
+    if (cached && cacheExpiry) {
+      const now = Date.now();
+      const expiry = parseInt(cacheExpiry);
+      if (now < expiry) {
+        console.log('✅ Using cached subscription status');
+        return JSON.parse(cached);
+      }
+    }
+    
+    console.log('Fetching fresh subscription status...');
     
     const response = makeAuthenticatedRequest('/subscription/status', {
       method: 'get'
     });
+    
+    // Cache the response
+    if (response && !response.error) {
+      userProperties.setProperty(CACHE_KEY, JSON.stringify(response));
+      userProperties.setProperty(CACHE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION_MS));
+      console.log('✅ Cached subscription status for 5 minutes');
+    }
     
     console.log('Subscription status:', JSON.stringify(response));
     return response;
     
   } catch (error) {
     console.error('Error checking subscription status:', error);
+    
+    // Try to return cached data even if expired (better than nothing)
+    try {
+      const userProperties = PropertiesService.getUserProperties();
+      const cached = userProperties.getProperty(CACHE_KEY);
+      if (cached) {
+        console.log('⚠️ Using expired cache due to error');
+        return JSON.parse(cached);
+      }
+    } catch (e) {
+      // Ignore cache errors
+    }
     
     // Return default free tier on error
     return {
