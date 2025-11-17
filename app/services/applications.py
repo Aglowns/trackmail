@@ -591,17 +591,28 @@ async def update_application(
         # No fields to update
         return await get_application_by_id(application_id, user_id)
     
-    # Perform update
+    # First verify the application exists and belongs to the user (RLS will handle this)
+    existing = await get_application_by_id(application_id, user_id)
+    if not existing:
+        return None
+    
+    # Add updated_at timestamp
+    update_data["updated_at"] = datetime.utcnow().isoformat()
+    
+    # Perform update (RLS ensures user can only update their own applications)
     result = (
         supabase.table("applications")
         .update(update_data)
         .eq("id", application_id)
+        .eq("user_id", user_id)  # Explicitly filter by user_id for security
         .execute()
     )
     
     if not result.data:
+        print(f"⚠️ Update failed: Application {application_id} not found or doesn't belong to user {user_id}")
         return None
     
+    print(f"✅ Successfully updated application {application_id} for user {user_id}")
     return result.data[0]
 
 
